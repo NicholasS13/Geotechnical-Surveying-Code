@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebBLE Sensor Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            flex-direction: column;
+        }
+
+        .content {
+            max-width: 500px;
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 10px 0;
+            border: none; 
+            border-radius: 5px;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer; 
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3; 
+        }
+
+        input {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin: 10px 0; 
+            border: 1px solid #ccc; 
+            border-radius: 5px;
+        }
+
+        #sensorData {
+            margin-top: 20px;
+            text-align: left; 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .value-box {
+            margin: 5px;
+            flex: 1; 
+            text-align: center;
+            height: 60px; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+        }
+
+        #sensorDataHistory {
+            margin-top: 20px; 
+            display: none; 
+            text-align: left; 
+        }
+
+        /* Compass styles */
+        .compass {
+            width: 200px;
+            height: 200px;
+            border: 10px solid #333;
+            border-radius: 50%;
+            position: relative;
+            background-color: #fff;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+            margin: 20px auto; 
+        }
+
+        .arrow {
+            width: 0;
+            height: 0;
+            border-left: 25px solid transparent;
+            border-right: 25px solid transparent;
+            border-bottom: 50px solid red; 
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom;
+            transform: translateX(-50%) translateY(10px) rotate(0deg); 
+        }
+    </style>
+</head>
+<body>
+
+    <h1>ESP32 S3 Feather Sensor Data</h1>
+    <div class="compass">
+        <div class="arrow" id="arrow"></div>
+    </div>
+        <button id="connect">Connect to ESP32</button>
+        <input id="commandInput" placeholder="Enter command">
+        <button id="submitCommandBtn">Submit Command</button>
+        
+        <div id="sensorData">
+            <div class="value-box">VWC: <span id="value1"></span></div>
+            <div class="value-box">Temp: <span id="value2"></span></div>
+            <div class="value-box">EC: <span id="value3"></span></div>
+        </div>
+        
+        <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
+        <div id="sensorDataHistory"></div>
+    
+
+    <script>
+        const SERVICE_UUID = '91bad492-b950-4226-aa2b-4ede9fa42f59';
+        const CHAR_UUID_SENSOR_DATA = '98e025d3-23e5-4b62-9916-cc6c330c84ac';
+        const CHAR_UUID_COMMAND = 'f78ebbff-c8b7-4107-93de-889a6a06d408';
+
+        let commandCharacteristic;
+
+        document.getElementById('connect').addEventListener('click', async () => {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ services: [SERVICE_UUID] }]
+                });
+
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                
+                const sensorDataCharacteristic = await service.getCharacteristic(CHAR_UUID_SENSOR_DATA);
+                commandCharacteristic = await service.getCharacteristic(CHAR_UUID_COMMAND);
+
+                await sensorDataCharacteristic.startNotifications();
+                sensorDataCharacteristic.addEventListener('characteristicvaluechanged', handleSensorData);
+
+                console.log('Connected to ESP32 S3 Feather');
+                document.getElementById("connect").style.visibility='none';
+            } catch (error) {
+                console.error('Error connecting to device:', error);
+            }
+        });
+
+        function handleSensorData(event) {
+            const value = event.target.value;
+            const data = new TextDecoder().decode(value);
+            const sensorDataDiv = document.getElementById('sensorDataHistory');
+            const now = new Date();
+            const dateTimeString = now.toLocaleTimeString();
+            sensorDataDiv.innerHTML = `${dateTimeString} - Sensor Data: ${data}<br>` + sensorDataDiv.innerHTML;
+
+            const values = data.split(',');
+
+            if (values.length >= 3) {
+                document.getElementById('value1').innerText = (values[0]/1000).toFixed(3);
+                document.getElementById('value2').innerText = values[1];
+                document.getElementById('value3').innerText = (values[2]/1000).toFixed(3);
+            } else {
+                console.error('Received data does not contain enough values:', data);
+            }
+
+            console.log('Received sensor data:', data);
+        }
+
+        function sendCommand(command) {
+            console.log("VALUE:" + String(command));
+            if (commandCharacteristic) {
+                const commandData = new TextEncoder().encode(command);
+                commandCharacteristic.writeValue(commandData)
+                    .then(() => {
+                        console.log(`Command "${command}" sent to the device.`);
+                    })
+                    .catch(error => {
+                        console.error('Error sending command:', error);
+                    });
+            } else {
+                console.error('Command characteristic not available.');
+            }
+        }
+
+        document.getElementById('submitCommandBtn').addEventListener('click', () => {
+            sendCommand(document.getElementById("commandInput").value);
+        });
+
+        document.getElementById('viewDataHistory').addEventListener('click', () => {
+            const sensorDataHistory = document.getElementById('sensorDataHistory');
+            sensorDataHistory.style.display = sensorDataHistory.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Function to manipulate the compass arrow
+        function updateCompass(angle) {
+            const arrow = document.getElementById('arrow');
+            arrow.style.transform = `translateX(-50%) translateY(10px) rotate(${angle}deg)`;
+        }
+
+        // Function to set direction based on user input
+        function setDirection() {
+            const angleInput = document.getElementById('angleInput').value;
+            updateCompass(angleInput);
+        }
+
+        // Function to reset the compass to 0 degrees
+        function resetCompass() {
+            updateCompass(0);
+        }
+    </script>
+</body>
+</html>
