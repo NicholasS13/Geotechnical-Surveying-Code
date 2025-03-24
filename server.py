@@ -22,19 +22,17 @@ def welcome():
 def send_sensor_values():
     global device_count
     data = request.json
-    value = data.get('sensorValue')
+    r_value = data.get('rValue')
+    g_value = data.get('gValue')
+    b_value = data.get('bValue')
     device_id = data.get('deviceID')
-    
-    print(f"Received value: {value} from device: {device_id}")
 
     if device_id == -1:
         device_id = device_count
         device_count += 1
-        response = {"msg": f"Value received: {value}", "deviceID": device_id}
-    else:
-        response = {"msg": f"Value received: {value} from {device_id}"}
+    print(f"Received value: {r_value}, {g_value}, {b_value} from device: {device_id}")
 
-    # Save the sensor value to a file
+    # Save the sensor value to a file JOE DELETE IF NOT NEEDED
     sensor_data = f"Device ID: {device_id}, Sensor Value: {value}, Timestamp: {datetime.datetime.now().isoformat()}\n"
     with open('sensorData.txt', 'a') as f:
         f.write(sensor_data)
@@ -47,6 +45,7 @@ def send_sensor_values():
     except subprocess.CalledProcessError as e:
         print(f"exec error: {e}")
     '''
+    #JOE IMPLEMENT UR CODE HERE
     return jsonify(response)
 
 #clears stored data
