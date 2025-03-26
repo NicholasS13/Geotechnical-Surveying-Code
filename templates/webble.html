@@ -116,9 +116,9 @@
         <button id="submitCommandBtn">Submit Command</button>
         
         <div id="sensorData">
-            <div class="value-box">VWC: <span id="value1"></span></div>
-            <div class="value-box">Temp: <span id="value2"></span></div>
-            <div class="value-box">EC: <span id="value3"></span></div>
+            <div class="value-box">R: <span id="value1"></span></div>
+            <div class="value-box">G: <span id="value2"></span></div>
+            <div class="value-box">B: <span id="value3"></span></div>
         </div>
         
         <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
@@ -153,7 +153,28 @@
                 console.error('Error connecting to device:', error);
             }
         });
-
+        function sendData(data){
+            const url = 'https://awaited-definite-cockatoo.ngrok-free.app/sendSensorValues';
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok ' + response.statusText);
+                }
+                return response.json(); 
+            })
+            .then(data => {
+                console.log('Success:', data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
         function handleSensorData(event) {
             const value = event.target.value;
             const data = new TextDecoder().decode(value);
@@ -165,9 +186,15 @@
             const values = data.split(',');
 
             if (values.length >= 3) {
-                document.getElementById('value1').innerText = (values[0]/1000).toFixed(3);
+                document.getElementById('value1').innerText = values[0];
                 document.getElementById('value2').innerText = values[1];
-                document.getElementById('value3').innerText = (values[2]/1000).toFixed(3);
+                document.getElementById('value3').innerText = values[2];
+                const data = {
+                    rValue:value[0],
+                    gValue:value[1],
+                    bValue:value[2]
+                }
+                sendData(data);
             } else {
                 console.error('Received data does not contain enough values:', data);
             }

@@ -5,5 +5,6 @@
 ### Go To NGROKs website, create free account using NJIT Google
 ### Create a Static Domain
 ### Replace static domain on line 75 with that newly created domain (or migrate to secrets.txt that we both have)
+#### Also replace the static domain on line 158 of templates/webble.html
 ### Run the program. then open that static URL from computer or phone (on iphone download Bluey)
 ### now you have the system up and running
