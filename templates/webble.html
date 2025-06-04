@@ -111,18 +111,20 @@
     <div class="compass">
         <div class="arrow" id="arrow"></div>
     </div>
-        <button id="connect">Connect to ESP32</button>
-        <input id="commandInput" placeholder="Enter command">
-        <button id="submitCommandBtn">Submit Command</button>
-        
-        <div id="sensorData">
-            <div class="value-box">VWC: <span id="value1"></span></div>
-            <div class="value-box">Temp: <span id="value2"></span></div>
-            <div class="value-box">EC: <span id="value3"></span></div>
-        </div>
-        
-        <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
-        <div id="sensorDataHistory"></div>
+    <button id="cannotgo"> Can Not Go forward</button>
+    <button id="connect">Connect to ESP32</button>
+    <input id="commandInput" placeholder="Enter command">
+    <button id="submitCommandBtn">Submit Command</button>
+    
+    <div id="sensorData">
+        <div class="value-box">VWC: <span id="value1"></span></div>
+        <div class="value-box">Temp: <span id="value2"></span></div>
+        <div class="value-box">EC: <span id="value3"></span></div>
+    </div>
+    
+    <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
+    <div id="sensorDataHistory"></div>
+    <div id='coordinateDIV' style="display: none;"></div>
     
 
     <script>
@@ -131,7 +133,8 @@
         const CHAR_UUID_COMMAND = 'f78ebbff-c8b7-4107-93de-889a6a06d408';
 
         let commandCharacteristic;
-
+        let deviceID=-1;
+        let x = document.getElementById("coordinateDIV")
         document.getElementById('connect').addEventListener('click', async () => {
             try {
                 const device = await navigator.bluetooth.requestDevice({
@@ -153,23 +156,74 @@
                 console.error('Error connecting to device:', error);
             }
         });
+        function getGeoData(){
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(success, error);
+            } else {
+                x.innerHTML='ERROR: Geolocation is not supported by this browser.'
+            }
+        }
+        function success(position) {
+            x.innerHTML =position.coords.latitude + "  " + position.coords.longitude;
+        }
 
+        function error(error) {
+        switch(error.code) {
+            case error.PERMISSION_DENIED:
+            x.innerHTML = "ERROR: User denied the request for Geolocation."
+            break;
+            case error.POSITION_UNAVAILABLE:
+            x.innerHTML = "ERROR: Location information is unavailable."
+            break;
+            case error.TIMEOUT:
+            x.innerHTML = "ERROR: The request to get user location timed out."
+            break;
+            case error.UNKNOWN_ERROR:
+            x.innerHTML = "ERROR: An unknown error occurred."
+            break;
+        }
+        }
         function handleSensorData(event) {
             const value = event.target.value;
             const data = new TextDecoder().decode(value);
             const sensorDataDiv = document.getElementById('sensorDataHistory');
             const now = new Date();
             const dateTimeString = now.toLocaleTimeString();
-            sensorDataDiv.innerHTML = `${dateTimeString} - Sensor Data: ${data}<br>` + sensorDataDiv.innerHTML;
+            getGeoData();
+            if(x.innerHTML.indexOf("ERROR:")==-1){
+                //preprocess geodata
+                //add timestamp: dateTimeString
+                const values = data.split(',');
+                //values.push(dateTimeString, x.innerHTML.toString())
+                data+=","+dateTimeString
+                sensorDataDiv.innerHTML = `${dateTimeString} - Sensor Data: ${data}<br>` + sensorDataDiv.innerHTML;
+                data+=","+x.innerHTML.toString();//moved so UI would look nicer and less repeat strings
+                
+                if (values.length >= 3) {
+                    document.getElementById('value1').innerText = (values[0]/1000).toFixed(3);
+                    document.getElementById('value2').innerText = values[1];
+                    document.getElementById('value3').innerText = (values[2]/1000).toFixed(3);
 
-            const values = data.split(',');
-
-            if (values.length >= 3) {
-                document.getElementById('value1').innerText = (values[0]/1000).toFixed(3);
-                document.getElementById('value2').innerText = values[1];
-                document.getElementById('value3').innerText = (values[2]/1000).toFixed(3);
-            } else {
-                console.error('Received data does not contain enough values:', data);
+                    fetch("/sendSensorValues",
+                    {
+                        method: "POST",
+                        headers: {
+                            'Accept': 'application/json, text/plain, */*',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({sensorValue:data, deviceID:deviceID})
+                    })
+                    .then(function(res){
+                        if(res.ok)
+                            if(deviceID==-1)
+                                deviceID = res.json().deviceID;
+                    })
+                    .catch((error)=>{console.log(error)});//Finish p
+                } else {
+                    console.error('Received data does not contain enough values:', data);
+                }
+            }else{
+                console.log("ERROR FOUND BUT UNSURE OF RESOLUTION")
             }
 
             console.log('Received sensor data:', data);
@@ -200,6 +254,14 @@
             sensorDataHistory.style.display = sensorDataHistory.style.display === 'none' ? 'block' : 'none';
         });
 
+        document.getElementById("cannotgo").addEventListener('click',() =>{
+            if(confirm("Is it shorter to go right?")){
+                updateCompass(90)
+            }
+            else
+                updateCompass(270)
+        })
+
         // Function to manipulate the compass arrow
         function updateCompass(angle) {
             const arrow = document.getElementById('arrow');
@@ -207,8 +269,7 @@
         }
 
         // Function to set direction based on user input
-        function setDirection() {
-            const angleInput = document.getElementById('angleInput').value;
+        function setDirection(angleInput) {
             updateCompass(angleInput);
         }
 
