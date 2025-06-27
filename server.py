@@ -1,14 +1,9 @@
-
 #!/usr/bin/env python3
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-from KrigingTraverse import kriging_traverse_maze, grid_to_longlat
+from KrigingTraverse import run_kriging_traverse
 import matplotlib.pyplot as plt
 import multiprocessing
-import pandas as pd
-import numpy as np
-from datetime import datetime
-import subprocess
 import threading
 import os
 
@@ -18,13 +13,29 @@ CORS(app)
 device_count = 0
 DATA_FILE_NAME = "sensorData.txt"
 
+# Global status dictionary (could also be stored in a file or DB)
+kriging_status = {
+    "running": False
+}
+
+
+def run_kriging_with_status():
+    """Wrapper to run kriging traverse and update status flag."""
+    global kriging_status
+    print("Starting kriging traversal process...")
+    kriging_status["running"] = True
+
+    try:
+        run_kriging_traverse()
+    except Exception as e:
+        print(f"Kriging traverse failed: {e}")
+    finally:
+        kriging_status["running"] = False
+        print("Kriging traversal completed.")
+
+
 @app.route("/sendSensorValues", methods=["POST"])
 def send_sensor_values():
-    """_summary_
-
-    Returns:
-        _type_: _description_
-    """
     global device_count
     data = request.json
     value = data.get("sensorValue")
@@ -39,14 +50,45 @@ def send_sensor_values():
     else:
         response = {"msg": f"Value received: {value} from {device_id}"}
 
-    # Append sensor data line in CSV style to sensorData.txt
-    # Example line: "VWC,TEMP,EC,Lon,Lat,Timestamp,RobotID"
     sensor_data_line = f"{value['VWC']},{value['TEMP']},{value['EC']},{value['Longitude']},{value['Latitude']},{value['Timestamp']},{device_id}\n"
     with open(DATA_FILE_NAME, "a") as f:
         f.write(sensor_data_line)
-        print("Sensor data saved to file")
+
+    # Only start kriging if not already running
+    if not kriging_status["running"]:
+        # Launch kriging in a separate process
+        p = multiprocessing.Process(target=run_kriging_with_status)
+        p.start()
+    else:
+        print("Kriging process already running. Skipping restart.")
 
     return jsonify(response)
+
+
+@app.route("/krigingStatus", methods=["GET"])
+def get_kriging_status():
+    """Return whether the kriging process is currently running."""
+    return jsonify({"running": kriging_status["running"]})
+
+@app.route("/getGoal/<int:device_id>", methods=["GET"])
+def get_goal(device_id):
+    """Fetch lon/lat from db.txt for the specified robot/device."""
+    goal_data = None
+    try:
+        with open("db.txt", "r") as f:
+            for line in f:
+                fields = line.strip().split(",")
+                if fields[0] == str(device_id):
+                    lon = float(fields[1])
+                    lat = float(fields[2])
+                    goal_data = {"lon": lon, "lat": lat}
+                    break
+        if goal_data:
+            return jsonify(goal_data)
+        else:
+            return jsonify({"error": "No goal found for device"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/clear", methods=["DELETE"])
@@ -58,40 +100,17 @@ def clear_sensor_data():
     except Exception as e:
         print(f"Error clearing file: {e}")
         return jsonify({"msg": "Error clearing file"}), 500
-def runTraverseFunc():
-    var_map, next_goals, bounds = kriging_traverse_maze("sensorData.txt")
-    lon_min, lon_max, lat_min, lat_max = bounds
 
-    print("\nNext Robot Goals:")
-    for robot, (i, j) in next_goals.items():
-        lon, lat = grid_to_longlat(i, j, (50, 50), lon_min, lon_max, lat_min, lat_max)
-        print(f"Robot {robot} → Cell ({i}, {j}) → GPS ({lon:.6f}, {lat:.6f})")
-
-    plt.imshow(var_map, origin="lower", cmap="viridis")
-    plt.colorbar(label="Kriging Variance")
-    plt.title("Kriging Variance Map")
-    plt.xlabel("X grid")
-    plt.ylabel("Y grid")
-    plt.savefig("results/Figure_1_python.png")
-    #plt.show()
-    
-
-
-@app.route("/runKriging", methods=["GET"])
-def runK():
-    thread = threading.Thread(target=runTraverseFunc)
-    thread.start();
-    return "RUNNING RUN_TRAVERSE"
 
 @app.route("/webble", methods=["GET"])
 def webble_api():
     return render_template("webble.html")
 
-#To be replaced with ngrok-flask but connects flask/computer to specified web domain
+
 def run_ngrok():
-    #CREATE NGROK ACCOUNT AND REPLACE STATIC URL WITH THE ONE U GET BECAUSE THIS URL IS ASSIGNED TO ME 
     command = 'ngrok http --url=awaited-definite-cockatoo.ngrok-free.app 8080'
     os.system(command)
+
 
 def run_server():
     app.run(port=8080)
@@ -99,5 +118,6 @@ def run_server():
 
 if __name__ == "__main__":
     server_process = multiprocessing.Process(target=run_server)
-    #ngrok_process = multiprocessing.Process(target=run_ngrok) # Port Forwarding to static domain
     server_process.start()
+    # ngrok_process = multiprocessing.Process(target=run_ngrok)
+    # ngrok_process.start()

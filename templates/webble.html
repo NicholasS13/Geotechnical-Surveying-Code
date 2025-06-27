@@ -1,282 +1,433 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebBLE Sensor Data</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            flex-direction: column;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WebBLE Sensor Data</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
+    }
 
-        .content {
-            max-width: 500px;
-            width: 100%;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            text-align: center;
-        }
+    .content {
+      max-width: 500px;
+      width: 100%;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      text-align: center;
+    }
 
-        h1 {
-            font-size: 1.5em;
-            margin-bottom: 20px;
-        }
+    h1 {
+      font-size: 1.5em;
+      margin-bottom: 20px;
+    }
 
-        button {
-            padding: 10px 15px;
-            margin: 10px 0;
-            border: none; 
-            border-radius: 5px;
-            background-color: #007BFF;
-            color: white;
-            cursor: pointer; 
-            transition: background-color 0.3s;
-        }
+    button {
+      padding: 10px 15px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 5px;
+      background-color: #007BFF;
+      color: white;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
 
-        button:hover {
-            background-color: #0056b3; 
-        }
+    button:hover {
+      background-color: #0056b3;
+    }
 
-        input {
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin: 10px 0; 
-            border: 1px solid #ccc; 
-            border-radius: 5px;
-        }
+    input {
+      width: calc(100% - 22px);
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
 
-        #sensorData {
-            margin-top: 20px;
-            text-align: left; 
-            display: flex; 
-            justify-content: space-between;
-            align-items: center;
-        }
+    #sensorData {
+      margin-top: 20px;
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
 
-        .value-box {
-            margin: 5px;
-            flex: 1; 
-            text-align: center;
-            height: 60px; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-        }
+    .value-box {
+      margin: 5px;
+      flex: 1;
+      text-align: center;
+      height: 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
 
-        #sensorDataHistory {
-            margin-top: 20px; 
-            display: none; 
-            text-align: left; 
-        }
+    #sensorDataHistory {
+      margin-top: 20px;
+      display: none;
+      text-align: left;
+    }
 
-        /* Compass styles */
-        .compass {
-            width: 200px;
-            height: 200px;
-            border: 10px solid #333;
-            border-radius: 50%;
-            position: relative;
-            background-color: #fff;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-            margin: 20px auto; 
-        }
+    .compass {
+      width: 200px;
+      height: 200px;
+      border: 10px solid #333;
+      border-radius: 50%;
+      position: relative;
+      background-color: #fff;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      margin: 20px auto;
+    }
 
-        .arrow {
-            width: 0;
-            height: 0;
-            border-left: 25px solid transparent;
-            border-right: 25px solid transparent;
-            border-bottom: 50px solid red; 
-            position: absolute;
-            bottom: 50%;
-            left: 50%;
-            transform-origin: bottom;
-            transform: translateX(-50%) translateY(10px) rotate(0deg); 
-        }
-    </style>
+    .arrow {
+      width: 0;
+      height: 0;
+      border-left: 25px solid transparent;
+      border-right: 25px solid transparent;
+      border-bottom: 50px solid red;
+      position: absolute;
+      bottom: 50%;
+      left: 50%;
+      transform-origin: bottom;
+      transform: translateX(-50%) translateY(10px) rotate(0deg);
+    }
+
+    #loading {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      color: #007BFF;
+      z-index: 9999;
+    }
+  </style>
 </head>
 <body>
 
-    <h1>ESP32 S3 Feather Sensor Data</h1>
-    <div class="compass">
-        <div class="arrow" id="arrow"></div>
-    </div>
-    <button id="cannotgo"> Can Not Go forward</button>
-    <button id="connect">Connect to ESP32</button>
-    <input id="commandInput" placeholder="Enter command">
-    <button id="submitCommandBtn">Submit Command</button>
-    
-    <div id="sensorData">
-        <div class="value-box">VWC: <span id="value1"></span></div>
-        <div class="value-box">Temp: <span id="value2"></span></div>
-        <div class="value-box">EC: <span id="value3"></span></div>
-    </div>
-    
-    <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
-    <div id="sensorDataHistory"></div>
-    <div id='coordinateDIV' style="display: none;"></div>
-    
+  <h1>ESP32 S3 Feather Sensor Data</h1>
 
+  <div id="loading">Loading Kriging Traverse...</div>
+
+  <div class="compass">
+    <div class="arrow" id="arrow"></div>
+  </div>
+
+  <button id="cannotgo">Can Not Go forward</button>
+  <button id="connect">Connect to ESP32</button>
+  <input id="commandInput" placeholder="Enter command"/>
+  <button id="submitCommandBtn">Submit Command</button>
+  <button id="getReadingBtn">Get Reading</button>
+  <div id="sensorData">
+    <div class="value-box">VWC: <span id="value1"></span></div>
+    <div class="value-box">Temp: <span id="value2"></span></div>
+    <div class="value-box">EC: <span id="value3"></span></div>
+  </div>
+  
+  <div style="margin-bottom: 10px;">
+    <label>Mock Latitude:</label>
+    <input type="number" id="mockLat" value="40.7452" step="0.000001"/>
+    <br>
+    <label>Mock Longitude:</label>
+    <input type="number" id="mockLon" value="-74.1728" step="0.000001"/>
+ </div>
+
+  <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
+  <div id="sensorDataHistory"></div>
+  <div id="coordinateDIV" style="display: none;"></div>
     <script>
-        const SERVICE_UUID = '91bad492-b950-4226-aa2b-4ede9fa42f59';
-        const CHAR_UUID_SENSOR_DATA = '98e025d3-23e5-4b62-9916-cc6c330c84ac';
-        const CHAR_UUID_COMMAND = 'f78ebbff-c8b7-4107-93de-889a6a06d408';
-
-        let commandCharacteristic;
-        let deviceID=-1;
-        let x = document.getElementById("coordinateDIV")
-        document.getElementById('connect').addEventListener('click', async () => {
-            try {
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }]
-                });
-
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                
-                const sensorDataCharacteristic = await service.getCharacteristic(CHAR_UUID_SENSOR_DATA);
-                commandCharacteristic = await service.getCharacteristic(CHAR_UUID_COMMAND);
-
-                await sensorDataCharacteristic.startNotifications();
-                sensorDataCharacteristic.addEventListener('characteristicvaluechanged', handleSensorData);
-
-                console.log('Connected to ESP32 S3 Feather');
-                document.getElementById("connect").style.visibility='none';
-            } catch (error) {
-                console.error('Error connecting to device:', error);
-            }
-        });
-        function getGeoData(){
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(success, error);
-            } else {
-                x.innerHTML='ERROR: Geolocation is not supported by this browser.'
-            }
-        }
-        function success(position) {
-            x.innerHTML =position.coords.latitude + "  " + position.coords.longitude;
-        }
-
-        function error(error) {
-        switch(error.code) {
-            case error.PERMISSION_DENIED:
-            x.innerHTML = "ERROR: User denied the request for Geolocation."
-            break;
-            case error.POSITION_UNAVAILABLE:
-            x.innerHTML = "ERROR: Location information is unavailable."
-            break;
-            case error.TIMEOUT:
-            x.innerHTML = "ERROR: The request to get user location timed out."
-            break;
-            case error.UNKNOWN_ERROR:
-            x.innerHTML = "ERROR: An unknown error occurred."
-            break;
-        }
-        }
-        function handleSensorData(event) {
-            const value = event.target.value;
-            const data = new TextDecoder().decode(value);
-            const sensorDataDiv = document.getElementById('sensorDataHistory');
-            const now = new Date();
-            const dateTimeString = now.toLocaleTimeString();
-            getGeoData();
-            if(x.innerHTML.indexOf("ERROR:")==-1){
-                //preprocess geodata
-                //add timestamp: dateTimeString
-                const values = data.split(',');
-                //values.push(dateTimeString, x.innerHTML.toString())
-                data+=","+dateTimeString
-                sensorDataDiv.innerHTML = `${dateTimeString} - Sensor Data: ${data}<br>` + sensorDataDiv.innerHTML;
-                data+=","+x.innerHTML.toString();//moved so UI would look nicer and less repeat strings
-                
-                if (values.length >= 3) {
-                    document.getElementById('value1').innerText = (values[0]/1000).toFixed(3);
-                    document.getElementById('value2').innerText = values[1];
-                    document.getElementById('value3').innerText = (values[2]/1000).toFixed(3);
-
-                    fetch("/sendSensorValues",
-                    {
-                        method: "POST",
-                        headers: {
-                            'Accept': 'application/json, text/plain, */*',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({sensorValue:data, deviceID:deviceID})
-                    })
-                    .then(function(res){
-                        if(res.ok)
-                            if(deviceID==-1)
-                                deviceID = res.json().deviceID;
-                    })
-                    .catch((error)=>{console.log(error)});//Finish p
-                } else {
-                    console.error('Received data does not contain enough values:', data);
-                }
-            }else{
-                console.log("ERROR FOUND BUT UNSURE OF RESOLUTION")
-            }
-
-            console.log('Received sensor data:', data);
-        }
-
-        function sendCommand(command) {
-            console.log("VALUE:" + String(command));
-            if (commandCharacteristic) {
-                const commandData = new TextEncoder().encode(command);
-                commandCharacteristic.writeValue(commandData)
-                    .then(() => {
-                        console.log(`Command "${command}" sent to the device.`);
-                    })
-                    .catch(error => {
-                        console.error('Error sending command:', error);
-                    });
-            } else {
-                console.error('Command characteristic not available.');
-            }
-        }
-
-        document.getElementById('submitCommandBtn').addEventListener('click', () => {
-            sendCommand(document.getElementById("commandInput").value);
-        });
-
-        document.getElementById('viewDataHistory').addEventListener('click', () => {
-            const sensorDataHistory = document.getElementById('sensorDataHistory');
-            sensorDataHistory.style.display = sensorDataHistory.style.display === 'none' ? 'block' : 'none';
-        });
-
-        document.getElementById("cannotgo").addEventListener('click',() =>{
-            if(confirm("Is it shorter to go right?")){
-                updateCompass(90)
-            }
-            else
-                updateCompass(270)
-        })
-
-        // Function to manipulate the compass arrow
-        function updateCompass(angle) {
-            const arrow = document.getElementById('arrow');
-            arrow.style.transform = `translateX(-50%) translateY(10px) rotate(${angle}deg)`;
-        }
-
-        // Function to set direction based on user input
-        function setDirection(angleInput) {
-            updateCompass(angleInput);
-        }
-
-        // Function to reset the compass to 0 degrees
-        function resetCompass() {
-            updateCompass(0);
-        }
+    navigator.geolocation.getCurrentPosition = function(success, error) {
+        const lat = parseFloat(document.getElementById("mockLat").value);
+        const lon = parseFloat(document.getElementById("mockLon").value);
+        const mockPosition = {
+        coords: {
+            latitude: lat,
+            longitude: lon,
+            accuracy: 5
+        },
+        timestamp: Date.now()
+        };
+        success(mockPosition);
+    };
     </script>
+  <script>
+    const SERVICE_UUID = '91bad492-b950-4226-aa2b-4ede9fa42f59';
+    const CHAR_UUID_SENSOR_DATA = '98e025d3-23e5-4b62-9916-cc6c330c84ac';
+    const CHAR_UUID_COMMAND = 'f78ebbff-c8b7-4107-93de-889a6a06d408';
+
+    let commandCharacteristic;
+    let deviceID = -1;
+    let coordinateD = document.getElementById("coordinateDIV");
+    let pollingInterval = null;
+    document.getElementById('getReadingBtn').addEventListener('click', generateMockSensorData);
+    document.getElementById('connect').addEventListener('click', async () => {
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ services: [SERVICE_UUID] }]
+        });
+
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        
+        const sensorDataCharacteristic = await service.getCharacteristic(CHAR_UUID_SENSOR_DATA);
+        commandCharacteristic = await service.getCharacteristic(CHAR_UUID_COMMAND);
+
+        await sensorDataCharacteristic.startNotifications();
+        sensorDataCharacteristic.addEventListener('characteristicvaluechanged', handleSensorData);
+
+        console.log('Connected to ESP32 S3 Feather');
+        document.getElementById("connect").style.display = 'none';
+      } catch (error) {
+        console.error('Error connecting to device:', error);
+      }
+    });
+
+    function getGeoData() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(success, error);
+      } else {
+        coordinateD.innerHTML = 'ERROR: Geolocation is not supported by this browser.';
+      }
+    }
+
+    function success(position) {
+      coordinateD.innerHTML = position.coords.latitude + "," + position.coords.longitude;
+    }
+
+    function error(error) {
+      switch(error.code) {
+        case error.PERMISSION_DENIED:
+          coordinateD.innerHTML = "ERROR: User denied the request for Geolocation.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          coordinateD.innerHTML = "ERROR: Location information is unavailable.";
+          break;
+        case error.TIMEOUT:
+          coordinateD.innerHTML = "ERROR: The request to get user location timed out.";
+          break;
+        case error.UNKNOWN_ERROR:
+          coordinateD.innerHTML = "ERROR: An unknown error occurred.";
+          break;
+      }
+    }
+
+    function handleSensorData(event) {
+      const value = event.target.value;
+      const data = new TextDecoder().decode(value);
+      const sensorDataDiv = document.getElementById('sensorDataHistory');
+      const now = new Date();
+      const dateTimeString = now.toLocaleTimeString();
+      getGeoData();
+
+      if (coordinateD.innerHTML.indexOf("ERROR:") === -1) {
+        const values = data.split(',');
+        const geo = coordinateD.innerHTML;
+        const combinedData = data + "," + dateTimeString + "," + geo;
+
+        sensorDataDiv.innerHTML =
+          `${dateTimeString} - Sensor Data: ${data}<br>` +
+          sensorDataDiv.innerHTML;
+
+        if (values.length >= 3) {
+          document.getElementById('value1').innerText = (values[0] / 1000).toFixed(3);
+          document.getElementById('value2').innerText = values[1];
+          document.getElementById('value3').innerText = (values[2] / 1000).toFixed(3);
+
+          const lonVal = parseFloat(values[3]);
+
+          // Separate into integer + fractional parts
+          const lonDeg = lonVal >= 0 ? Math.floor(lonVal) : Math.ceil(lonVal);
+          const lonMicro = Math.round(Math.abs(lonVal - lonDeg) * 1e6);
+
+          const latVal = parseFloat(values[4]);
+
+          // Separate into integer + fractional parts
+          const latDeg = latVal >= 0 ? Math.floor(latVal) : Math.ceil(latVal);
+          const latMicro = Math.round(Math.abs(latVal - latDeg) * 1e6);
+          console.log(values[3])
+          console.log(lonVal)
+          console.log(lonMicro)
+
+          fetch("/sendSensorValues", {
+            
+            method: "POST",
+            headers: {
+              'Accept': 'application/json, text/plain, */*',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                    sensorValue: {
+                        VWC: values[0],
+                        TEMP: values[1],
+                        EC: values[2],
+                        Longitude: values[3],
+                        Longitude_decimal: lonMicro,
+                        Latitude: values[4],
+                        Latitude_decimal:latMicro,
+                        Timestamp: dateTimeString
+                    },
+                    deviceID: deviceID
+                })
+          })
+          .then(function(res) {
+            if (res.ok) {
+              res.json().then(json => {
+                if (deviceID == -1) {
+                  deviceID = json.deviceID;
+                }
+                startPollingKrigingStatus();
+              });
+            }
+          })
+          .catch(error => console.log(error));
+        } else {
+          console.error('Received data does not contain enough values:', data);
+        }
+      } else {
+        console.log("ERROR FOUND BUT UNSURE OF RESOLUTION");
+      }
+
+      console.log('Received sensor data:', data);
+    }
+
+    function sendCommand(command) {
+      console.log("VALUE: " + String(command));
+      if (commandCharacteristic) {
+        const commandData = new TextEncoder().encode(command);
+        commandCharacteristic.writeValue(commandData)
+          .then(() => {
+            console.log(`Command "${command}" sent to the device.`);
+          })
+          .catch(error => {
+            console.error('Error sending command:', error);
+          });
+      } else {
+        console.error('Command characteristic not available.');
+      }
+    }
+
+    document.getElementById('submitCommandBtn').addEventListener('click', () => {
+      sendCommand(document.getElementById("commandInput").value);
+    });
+
+    document.getElementById('viewDataHistory').addEventListener('click', () => {
+      const sensorDataHistory = document.getElementById('sensorDataHistory');
+      sensorDataHistory.style.display =
+        sensorDataHistory.style.display === 'none' ? 'block' : 'none';
+    });
+
+    document.getElementById("cannotgo").addEventListener('click', () => {
+      if (confirm("Is it shorter to go right?")) {
+        updateCompass(90);
+      } else {
+        updateCompass(270);
+      }
+    });
+
+    function updateCompass(angle) {
+      const arrow = document.getElementById('arrow');
+      arrow.style.transform =
+        `translateX(-50%) translateY(10px) rotate(${angle}deg)`;
+    }
+
+    function resetCompass() {
+      updateCompass(0);
+    }
+
+    function startPollingKrigingStatus() {
+      document.querySelector('.compass').style.display = "none";
+      document.getElementById('loading').style.display = "block";
+
+      pollingInterval = setInterval(() => {
+        fetch('/krigingStatus')
+          .then(response => response.json())
+          .then(data => {
+            if (!data.running) {
+              clearInterval(pollingInterval);
+              document.getElementById('loading').style.display = "none";
+              document.querySelector('.compass').style.display = "block";
+              getGoalAndUpdateCompass();
+            }
+          })
+          .catch(err => console.error(err));
+      }, 2000);
+    }
+
+    function getGoalAndUpdateCompass() {
+      if (deviceID === -1) {
+        console.error("Device ID not yet assigned.");
+        return;
+      }
+
+      fetch(`/getGoal/${deviceID}`)
+        .then(response => response.json())
+        .then(goal => {
+          if (goal.error) {
+            console.error(goal.error);
+            return;
+          }
+          console.log("Goal coordinates:", goal);
+          navigator.geolocation.getCurrentPosition(
+            function(position) {
+              const userLat = position.coords.latitude;
+              const userLon = position.coords.longitude;
+
+              const angle = calculateBearing(userLat, userLon, goal.lat, goal.lon);
+              console.log("Angle to goal:", angle);
+              updateCompass(angle);
+            },
+            function(error) {
+              console.error("Geolocation error:", error);
+            }
+          );
+        })
+        .catch(err => console.error(err));
+    }
+
+    function calculateBearing(lat1, lon1, lat2, lon2) {
+      function toRad(deg) { return deg * Math.PI / 180; }
+      function toDeg(rad) { return rad * 180 / Math.PI; }
+
+      const dLon = toRad(lon2 - lon1);
+      const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+      const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+                Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+      let brng = Math.atan2(y, x);
+      brng = toDeg(brng);
+      return (brng + 360) % 360;
+    }
+    function generateMockSensorData() {
+        const VWC = (Math.random() * (0.50 - 0.22) + 0.22).toFixed(3);
+        const TEMP = (Math.random() * (25.8 - 24.6) + 24.6).toFixed(1);
+        const EC = (Math.random() * (1.9 - 1.3) + 1.3).toFixed(3);
+
+        const lat = parseFloat(document.getElementById("mockLat").value);
+        const lon = parseFloat(document.getElementById("mockLon").value);
+        const now = new Date();
+        const timestamp = now.toLocaleTimeString();
+
+        const dataString = `${VWC},${TEMP},${EC},${lon},${lat},${timestamp}`;
+        console.log("MOCK SENSOR DATA:", dataString);
+
+        // simulate BLE notification payload
+        handleSensorData({
+            target: {
+                value: new TextEncoder().encode(dataString)
+            }
+        });
+    }
+  </script>
 </body>
 </html>
