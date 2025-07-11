@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-from KrigingTraverse import run_kriging_traverse
+from new_kriging_traverse import visualize_initial_state, create_grid_around_robot1, run_multi_robot_exploration_with_visualization
 import matplotlib.pyplot as plt
 import multiprocessing
 import threading
@@ -9,6 +9,7 @@ import os
 
 app = Flask(__name__)
 CORS(app)
+cell_size=0.00012
 
 device_count = 0
 DATA_FILE_NAME = "sensorData.txt"
@@ -18,20 +19,59 @@ kriging_status = {
     "running": False
 }
 
+run_kriging_traverse_call_count=0;
+
+def get_different_last_values(file_path):
+    last_values = set()
+    different_entries = []
+    with open(file_path, 'r') as file:
+        for line in file:
+            # Strip whitespace and split the line by commas
+            entries = line.strip().split(',')
+            if entries:  # Check if the line is not empty
+                last_value = entries[-1]  # Get the last value
+                if last_value not in last_values:
+                    last_values.add(last_value)
+                    different_entries.append(line.strip())  # Store the entire line
+    return different_entries
 
 def run_kriging_with_status():
     """Wrapper to run kriging traverse and update status flag."""
     global kriging_status
+    global run_kriging_traverse_call_count
     print("Starting kriging traversal process...")
     kriging_status["running"] = True
-
-    try:
-        run_kriging_traverse()
-    except Exception as e:
-        print(f"Kriging traverse failed: {e}")
-    finally:
-        kriging_status["running"] = False
-        print("Kriging traversal completed.")
+    if (len(get_different_last_values("sensorData.txt"))>=3):
+        try:
+            # Define the grid size and cell size
+            # Example run
+            grid_size = 5
+            robot_vmc_values = []
+            robot_positions = []
+            lowest_entries = {}
+            with open('sensorData.txt', 'r') as file:
+                for line in file:
+                    values = line.strip().split(',')
+                    # Get the unique value at index -1
+                    unique_value = values[-1]
+                    # Convert VMC to float for comparison
+                    vmc = float(values[0])
+                    lowest_entries[unique_value] = (vmc, values)
+            # Now process the latest unique entries (each individual device)
+            for _, values in lowest_entries.values():# _ is the
+                vmc = float(values[0])
+                lon = float(values[3])
+                lat = float(values[4])
+                robot_positions.append((lon,lat))
+                robot_vmc_values.append(vmc)
+            grid_X, grid_Y = create_grid_around_robot1(robot_positions[0], grid_size, cell_size)
+            _ ,Zhat = run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions.copy(), robot_vmc_values.copy(), num_iterations=3)
+            visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size)   
+        except Exception as e:
+            print(f"Kriging traverse failed: {e}")
+        finally:
+            kriging_status["running"] = False
+            print("Kriging traversal completed.")
 
 
 @app.route("/sendSensorValues", methods=["POST"])
@@ -50,7 +90,10 @@ def send_sensor_values():
     else:
         response = {"msg": f"Value received: {value} from {device_id}"}
 
-    sensor_data_line = f"{value['VWC']},{value['TEMP']},{value['EC']},{value['Longitude']},{value['Latitude']},{value['Timestamp']},{device_id}\n"
+    lon = value.get('Longitude', 'NA')
+    lat = value.get('Latitude', 'NA')
+    sensor_data_line = f"{value['VWC']},{value['TEMP']},{value['EC']},{lon},{lat},{value['Timestamp']},{device_id}\n"
+
     with open(DATA_FILE_NAME, "a") as f:
         f.write(sensor_data_line)
 
@@ -102,6 +145,7 @@ def clear_sensor_data():
         return jsonify({"msg": "Error clearing file"}), 500
 
 
+
 @app.route("/webble", methods=["GET"])
 def webble_api():
     return render_template("webble.html")
@@ -116,8 +160,9 @@ def run_server():
     app.run(port=8080)
 
 
+
 if __name__ == "__main__":
     server_process = multiprocessing.Process(target=run_server)
     server_process.start()
-    # ngrok_process = multiprocessing.Process(target=run_ngrok)
-    # ngrok_process.start()
+    ngrok_process = multiprocessing.Process(target=run_ngrok)
+    ngrok_process.start()
