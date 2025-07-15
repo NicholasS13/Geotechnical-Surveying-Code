@@ -375,6 +375,38 @@ upda
         callback(new Error("Geolocation not supported."), null);
       }
     }
+    function startLocationTracking() {
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            document.getElementById("currentPosition").innerText =
+              `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+
+            // Optionally update compass as well
+            if (deviceID !== -1) {
+              updateAllGoalsAndCompass(lat,lon);
+            }
+          },
+          (error) => {
+            console.error("Geolocation error:", error);
+            document.getElementById("currentPosition").innerText =
+              "Lat: —, Lon: — (location unavailable)";
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 1000,
+            timeout: 5000,
+          }
+        );
+      } else {
+        console.error("Geolocation not supported.");
+        document.getElementById("currentPosition").innerText =
+          "Lat: —, Lon: — (not supported)";
+      }
+    }
+
 
     function handleSensorData(event) {
       const value = event.target.value;
@@ -565,50 +597,47 @@ upda
       }
     }
 
-    async function updateAllGoalsAndCompass() {
+    async function updateAllGoalsAndCompass(currentLat, currentLon) {
       if (deviceID === -1) {
-        // Reset UI if no device ID assigned
         document.getElementById('goalPosition').innerText = "Lat: —, Lon: —";
         document.getElementById('distanceBox').textContent = "Distance to goal: —";
-        updateArrow(0); // arrow points straight ahead
+        updateArrow(0);
         return;
       }
-      if (deviceID !== -1) {
-        const currentGoal = await fetchGoalForDevice(deviceID);
-        if (currentGoal) {
-          document.getElementById('goalPosition').innerText =
-            `Lat: ${currentGoal.lat.toFixed(6)}, Lon: ${currentGoal.lon.toFixed(6)}`;
 
-          getGeoData((err, pos) => {
-            if (!err && pos) {
-              const userLat = pos.coords.latitude;
-              const userLon = pos.coords.longitude;
-              const goalLat = currentGoal.lat;
-              const goalLon = currentGoal.lon;
+      const currentGoal = await fetchGoalForDevice(deviceID);
+      if (currentGoal) {
+        document.getElementById('goalPosition').innerText =
+          `Lat: ${currentGoal.lat.toFixed(6)}, Lon: ${currentGoal.lon.toFixed(6)}`;
 
-              const bearing = calculateBearing(
-                userLat,
-                userLon,
-                goalLat,
-                goalLon
-              );
+        const goalLat = currentGoal.lat;
+        const goalLon = currentGoal.lon;
 
-              const distance = haversineDistance(
-                userLat,
-                userLon,
-                goalLat,
-                goalLon
-              );
+        const bearing = calculateBearing(
+          currentLat,
+          currentLon,
+          goalLat,
+          goalLon
+        );
 
-              updateArrow(bearing);
+        const distance = haversineDistance(
+          currentLat,
+          currentLon,
+          goalLat,
+          goalLon
+        );
 
-              const distanceBox = document.getElementById('distanceBox');
-              distanceBox.textContent = `Distance to goal: ${distance.toFixed(1)} meters`;
-            }
-          });
-        }
+        updateArrow(bearing);
+
+        document.getElementById('distanceBox').textContent =
+          `Distance to goal: ${distance.toFixed(1)} meters`;
+      } else {
+        document.getElementById('goalPosition').innerText = "Lat: —, Lon: —";
+        document.getElementById('distanceBox').textContent = "Distance to goal: —";
+        updateArrow(0);
       }
     }
+
 
     function calculateBearing(lat1, lon1, lat2, lon2) {
       const dLon = (lon2 - lon1) * Math.PI / 180;
@@ -659,6 +688,7 @@ upda
     });
 
     setInterval(updateMeasurementStatus, 5000);
+    startLocationTracking();
 </script>
 </body>
 </html>
