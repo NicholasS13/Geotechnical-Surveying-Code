@@ -3,6 +3,46 @@ import matplotlib.pyplot as plt
 from pykrige.ok import OrdinaryKriging
 import heapq
 cell_size=0.00012
+
+# Load existing entries from db.txt to avoid duplicates
+def read_existing_robot_ids(filepath="db.txt"):
+    existing_ids = set()
+    try:
+        with open(filepath, "r") as f:
+            for line in f:
+                fields = line.strip().split(",")
+                if fields and fields[0].isdigit():
+                    existing_ids.add(int(fields[0]))
+    except FileNotFoundError:
+        pass  # file will be created if doesn't exist
+    return existing_ids
+
+def add_or_update_robot_position(robot_id, x, y, filepath="db.txt"):
+    try:
+        with open(filepath, "r") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        lines = []
+
+    found = False
+    new_lines = []
+    for line in lines:
+        fields = line.strip().split(",")
+        if fields and fields[0].isdigit() and int(fields[0]) == robot_id:
+            # Update this robot's line
+            new_lines.append(f"{robot_id},{x},{y}\n")
+            found = True
+        else:
+            new_lines.append(line)
+
+    if not found:
+        # Add new line if robot_id not found
+        new_lines.append(f"{robot_id},{x},{y}\n")
+
+    with open(filepath, "w") as f:
+        f.writelines(new_lines)
+
+
 def create_grid_around_robot1(robot_position, grid_size, cell_size):
     if grid_size % 2 == 0:
         raise ValueError("Grid size must be odd.")
@@ -171,11 +211,10 @@ def run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positio
             robot_paths[i].append(new_idx)
             new_pos = (grid_X[new_idx], grid_Y[new_idx])
             print(f"Robot {i+1} moved to: {new_pos}")
-            with open('db.txt', 'a') as db_file:
-                # writting to pseudo server so that the calling file (server.py) can know where to send each device (device[i])
-                db_file.write(f"{i},{new_pos[0]}{new_pos[1]}\n")
+            #updates db.txt
+            add_or_update_robot_position(i, new_pos[0], new_pos[1])
+                    
+
 
         visualize_robot_paths(grid_X, grid_Y, robot_paths, Zhat, step, cell_size=cell_size)
     return robot_paths, Zhat
-
-

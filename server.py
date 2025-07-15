@@ -45,7 +45,7 @@ def run_kriging_with_status():
         try:
             # Define the grid size and cell size
             # Example run
-            grid_size = 5
+            grid_size = 3
             robot_vmc_values = []
             robot_positions = []
             lowest_entries = {}
@@ -107,11 +107,23 @@ def send_sensor_values():
 
     return jsonify(response)
 
-
 @app.route("/krigingStatus", methods=["GET"])
 def get_kriging_status():
-    """Return whether the kriging process is currently running."""
-    return jsonify({"running": kriging_status["running"]})
+    """Return whether the kriging process is currently running and how many devices have data."""
+    try:
+        entries = get_different_last_values(DATA_FILE_NAME)
+        device_count = len(entries)
+        return jsonify({
+            "running": kriging_status["running"],
+            "deviceCount": device_count
+        })
+    except Exception as e:
+        return jsonify({
+            "running": kriging_status["running"],
+            "deviceCount": 0,
+            "error": str(e)
+        }), 500
+
 
 @app.route("/getGoal/<int:device_id>", methods=["GET"])
 def get_goal(device_id):

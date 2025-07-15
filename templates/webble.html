@@ -2,23 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>WebBLE Sensor Data</title>
   <link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
-<style>
-  #map {
-    height: 400px;
-    width: 100%;
-    margin-top: 20px;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.3);
-  }
-</style>
-
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
   <style>
+    #map {
+      height: 400px;
+      width: 100%;
+      margin-top: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+    }
+
     body {
       font-family: Arial, sans-serif;
       background-color: #f4f4f4;
@@ -29,7 +27,7 @@
       align-items: center;
       min-height: 100vh;
     }
-
+upda
     .content {
       max-width: 500px;
       width: 100%;
@@ -103,112 +101,25 @@
       z-index: 9999;
     }
 
-    .compass-container {
+    /* Arrow container without circle */
+    .arrow-container {
       position: relative;
-      width: 250px;
-      height: 250px;
+      width: 150px;
+      height: 150px;
       margin: 20px auto;
+      background: transparent;  /* Removed circle background */
+      border-radius: 0;
+      box-shadow: none;
+      border: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
-
-    .compass {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background-color: #fff;
-      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
-      border: 8px solid #333;
-      box-sizing: border-box;
-    }
-
-    .compass::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      border-radius: 50%;
-      background: conic-gradient(
-        #ff0000 0deg 15deg,
-        #333 15deg 75deg,
-        #ff0000 75deg 105deg,
-        #333 105deg 165deg,
-        #ff0000 165deg 195deg,
-        #333 195deg 255deg,
-        #ff0000 255deg 285deg,
-        #333 285deg 345deg,
-        #ff0000 345deg 360deg
-      );
-      opacity: 0.2;
-    }
-
-    .compass-ring {
-      position: absolute;
-      width: 90%;
-      height: 90%;
-      border-radius: 50%;
-      top: 5%;
-      left: 5%;
-      border: 2px solid #333;
-      box-sizing: border-box;
-    }
-
-    .compass-point {
-      position: absolute;
-      font-weight: bold;
-      font-size: 16px;
-      color: #333;
-    }
-
-    .compass-point.north {
-      top: 5px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    .compass-point.east {
-      right: 5px;
-      top: 50%;
-      transform: translateY(-50%);
-    }
-
-    .compass-point.south {
-      bottom: 5px;
-      left: 50%;
-      transform: translateX(-50%);
-    }
-
-    .compass-point.west {
-      left: 5px;
-      top: 50%;
-      transform: translateY(-50%);
-    }
-
-    .arrow {
-      position: absolute;
-      width: 10px;
-      height: 40%;
-      background-color: red;
-      left: 50%;
-      bottom: 50%;
-      transform-origin: bottom;
-      transform: translateX(-50%) translateY(10px) rotate(0deg);
-      z-index: 10;
-      border-radius: 5px 5px 0 0;
+    .arrow-svg {
+      width: 60px;
+      height: 60px;
       transition: transform 0.3s ease;
-    }
-
-    .arrow::before {
-      content: '';
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      background-color: red;
-      border-radius: 50%;
-      bottom: -10px;
-      left: 50%;
-      transform: translateX(-50%);
+      transform-origin: 50% 50%;
     }
 
     .controls {
@@ -266,32 +177,74 @@
     .position-info h3 {
       margin: 10px 0 5px;
     }
+
+    #measurementStatus {
+      width: 100%;
+      max-width: 500px;
+      background-color: #fffae6;
+      color: #8a6d3b;
+      border: 1px solid #faebcc;
+      padding: 12px 20px;
+      margin-bottom: 15px;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: bold;
+      box-shadow: 0 0 6px rgba(250, 235, 204, 0.7);
+    }
+
+    /* Hide all devices goal list permanently */
+    .goal-list {
+      display: none;
+    }
+    .distance-box {
+      margin-top: 15px;
+      background: #e7f3ff;
+      color: #004085;
+      border: 1px solid #b8daff;
+      border-radius: 6px;
+      padding: 12px;
+      font-weight: bold;
+      max-width: 400px;
+      text-align: center;
+      box-shadow: 0 0 6px rgba(0, 123, 255, 0.3);
+    }
   </style>
 </head>
 <body>
 
   <h1>ESP32 S3 Feather Sensor Data</h1>
 
+  <!-- Standing textbox with measurement advice -->
+  <div id="measurementStatus">Loading measurement status...</div>
+
   <div id="loading">Loading Kriging Traverse...</div>
+
   <button id="enableCompassBtn">Enable Compass</button>
 
-  <div class="compass-container">
-    <div class="compass">
-      <div class="compass-ring"></div>
-      <div class="compass-point north"></div>
-      <div class="compass-point east"></div>
-      <div class="compass-point south"></div>
-      <div class="compass-point west"></div>
-      <div class="arrow" id="arrow"></div>
-    </div>
+  <div class="arrow-container" title="Arrow points towards goal">
+    <svg id="arrow" class="arrow-svg" viewBox="0 0 100 100" width="100" height="100">
+      <polygon points="50,10 90,90 50,70 10,90" fill="red"/>
+    </svg>
+
   </div>
 
   <div class="position-info">
-    <h3>Goal Position</h3>
+    <h3>Goal Position (Device <span id="mainDeviceId">-</span>)</h3>
     <p id="goalPosition">Lat: —, Lon: —</p>
 
     <h3>Current Position</h3>
     <p id="currentPosition">Lat: —, Lon: —</p>
+  </div>
+
+  <div id="distanceBox" class="distance-box">
+    Distance to goal: —
+  </div>
+  <!-- All devices goal list hidden permanently -->
+  <div class="goal-list" id="allGoalPositions">
+    <h3>All Devices Goal Positions</h3>
+    <div id="goalDevice0" class="goal-item">Device 0: Lat: —, Lon: —</div>
+    <div id="goalDevice1" class="goal-item">Device 1: Lat: —, Lon: —</div>
+    <div id="goalDevice2" class="goal-item">Device 2: Lat: —, Lon: —</div>
   </div>
 
   <button id="cannotgo">Can Not Go forward</button>
@@ -299,7 +252,6 @@
   <input id="commandInput" placeholder="Enter command"/>
   <button id="submitCommandBtn">Submit Command</button>
   <button id="getReadingBtn">Get Reading</button>
-  <h1> For initial reading, have 2 devices go to opposite corners and any extras can go towards the middle</h1>
   <input id="VMCInput" placeholder="Enter VMC"/>
   <div id="sensorData">
     <div class="value-box">VWC: <span id="value1"></span></div>
@@ -324,6 +276,13 @@
   <script>
     let deviceHeading = 0;
     let goalBearing = null;
+    let deviceID = -1;
+    let devicesWithReadings = new Set();
+
+    // Elements
+    const measurementStatusEl = document.getElementById("measurementStatus");
+    const mainDeviceIdEl = document.getElementById("mainDeviceId");
+    const coordinateD = document.getElementById("coordinateDIV");
 
     async function setupDeviceOrientation() {
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -345,8 +304,6 @@
       }
     }
 
-    
-
     function handleOrientation(event) {
       if (event.absolute || event.webkitCompassHeading !== undefined) {
         deviceHeading = event.webkitCompassHeading || 0;
@@ -354,9 +311,9 @@
         deviceHeading = 360 - event.alpha;
       }
       if (goalBearing !== null) {
-        updateCompass(goalBearing);
+        updateArrow(goalBearing);
       } else {
-        updateCompass(deviceHeading);
+        updateArrow(deviceHeading);
       }
     }
 
@@ -365,8 +322,6 @@
     const CHAR_UUID_COMMAND = 'f78ebbff-c8b7-4107-93de-889a6a06d408';
 
     let commandCharacteristic;
-    let deviceID = -1;
-    let coordinateD = document.getElementById("coordinateDIV");
     let pollingInterval = null;
 
     document.getElementById('getReadingBtn').addEventListener('click', generateMockSensorData);
@@ -379,7 +334,7 @@
 
         const server = await device.gatt.connect();
         const service = await server.getPrimaryService(SERVICE_UUID);
-        
+
         const sensorDataCharacteristic = await service.getCharacteristic(CHAR_UUID_SENSOR_DATA);
         commandCharacteristic = await service.getCharacteristic(CHAR_UUID_COMMAND);
 
@@ -474,9 +429,21 @@
           .then(data => {
             console.log("Server Response:", data);
             if (data.deviceID !== undefined && data.deviceID !== -1) {
-              deviceID = data.deviceID;
-              console.log("Updated deviceID to", deviceID);
+              if (deviceID === -1) {
+                // On first assigned ID, update main device ID in UI
+                mainDeviceIdEl.innerText = data.deviceID;
+                deviceID = data.deviceID;
+                devicesWithReadings.add(deviceID);
+                updateMeasurementStatus();
+                updateAllGoalsAndCompass(); // <-- ADD THIS!
+                console.log("Updated deviceID to", deviceID);
+              } else {
+                deviceID = data.deviceID;
+                devicesWithReadings.add(deviceID);
+                updateMeasurementStatus();
+              }
             }
+
             document.getElementById("currentPosition").innerText =
               `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
             fetch('/krigingStatus')
@@ -485,9 +452,11 @@
                 if (!data.running) {
                   clearInterval(pollingInterval);
                   document.getElementById('loading').style.display = "none";
-                  document.querySelector('.compass').style.display = "block";
-                  getGoalAndUpdateCompass();
+                  document.querySelector('.arrow-container').style.display = "flex";
+                  updateMeasurementStatus();
+                  updateAllGoalsAndCompass();
                 }
+
               })
               .catch(err => console.error(err));
           })
@@ -523,27 +492,27 @@
 
     document.getElementById("cannotgo").addEventListener('click', () => {
       if (confirm("Is it shorter to go right?")) {
-        updateCompass(90);
+        updateArrow(90);
       } else {
-        updateCompass(270);
+        updateArrow(270);
       }
     });
 
-    function updateCompass(goalBearingInput) {
+    function updateArrow(goalBearingInput) {
       goalBearing = goalBearingInput;
       const relativeAngle = (goalBearing - deviceHeading + 360) % 360;
       const arrow = document.getElementById('arrow');
       arrow.style.transform =
-        `translateX(-50%) translateY(10px) rotate(${relativeAngle}deg)`;
+        `rotate(${relativeAngle}deg)`;
     }
 
-    function resetCompass() {
+    function resetArrow() {
       goalBearing = null;
-      updateCompass(0);
+      updateArrow(0);
     }
 
     function startPollingKrigingStatus() {
-      document.querySelector('.compass').style.display = "none";
+      document.querySelector('.arrow-container').style.display = "none";
       document.getElementById('loading').style.display = "block";
 
       pollingInterval = setInterval(() => {
@@ -553,110 +522,143 @@
             if (!data.running) {
               clearInterval(pollingInterval);
               document.getElementById('loading').style.display = "none";
-              document.querySelector('.compass').style.display = "block";
-              getGoalAndUpdateCompass();
+              document.querySelector('.arrow-container').style.display = "flex";
+              updateAllGoalsAndCompass();
             }
           })
           .catch(err => console.error(err));
       }, 2000);
     }
 
-    function getGoalAndUpdateCompass() {
-      if (deviceID === -1) {
-        console.error("Device ID not yet assigned.");
-        return;
+    async function updateMeasurementStatus() {
+      try {
+        const response = await fetch('/krigingStatus');
+        const data = await response.json();
+
+        const count = data.deviceCount ?? 0;
+
+        if (count < 3) {
+          measurementStatusEl.textContent = 
+            `Only ${count} device(s) reporting. Please take more measurements (need at least 3).`;
+        } else {
+          measurementStatusEl.textContent = 
+            "3 or more devices reporting. You may proceed with measurements.";
+        }
+      } catch (e) {
+        console.error("Error updating measurement status", e);
+        measurementStatusEl.textContent = "Could not load device count.";
       }
-
-      fetch(`/getGoal/${deviceID}`)
-        .then(response => response.json())
-        .then(goal => {
-          if (goal.error) {
-            console.error(goal.error);
-            return;
-          }
-          document.getElementById("goalPosition").innerText =
-            `Lat: ${goal.lat.toFixed(6)}, Lon: ${goal.lon.toFixed(6)}`;
-
-          navigator.geolocation.getCurrentPosition(position => {
-            const lat1 = position.coords.latitude;
-            const lon1 = position.coords.longitude;
-            const lat2 = goal.lat;
-            const lon2 = goal.lon;
-
-            const dLon = (lon2 - lon1) * (Math.PI/180);
-            const y = Math.sin(dLon) * Math.cos(lat2 * (Math.PI/180));
-            const x = Math.cos(lat1 * (Math.PI/180)) * Math.sin(lat2 * (Math.PI/180))
-                     - Math.sin(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * Math.cos(dLon);
-            const bearing = (Math.atan2(y, x) * (180/Math.PI) + 360) % 360;
-
-            updateCompass(bearing);
-          }, error => {
-            console.error("Error getting current position:", error);
-          });
-        })
-        .catch(err => console.error(err));
     }
 
-    document.getElementById('enableCompassBtn').addEventListener('click', () => {
-      setupDeviceOrientation();
-    });
 
-    document.getElementById('closeModal').addEventListener('click', () => {
-      document.getElementById('readingModal').style.display = 'none';
-    });
+    async function fetchGoalForDevice(id) {
+      try {
+        const response = await fetch(`/getGoal/${id}`);
+        if (!response.ok) {
+          throw new Error(`No goal for device ${id}`);
+        }
+        const data = await response.json();
+        return data;
+      } catch (e) {
+        console.warn(e);
+        return null;
+      }
+    }
 
-    document.getElementById('cancelReadingBtn').addEventListener('click', () => {
-      document.getElementById('readingModal').style.display = 'none';
-    });
+    async function updateAllGoalsAndCompass() {
+      if (deviceID === -1) {
+        // Reset UI if no device ID assigned
+        document.getElementById('goalPosition').innerText = "Lat: —, Lon: —";
+        document.getElementById('distanceBox').textContent = "Distance to goal: —";
+        updateArrow(0); // arrow points straight ahead
+        return;
+      }
+      if (deviceID !== -1) {
+        const currentGoal = await fetchGoalForDevice(deviceID);
+        if (currentGoal) {
+          document.getElementById('goalPosition').innerText =
+            `Lat: ${currentGoal.lat.toFixed(6)}, Lon: ${currentGoal.lon.toFixed(6)}`;
 
-    document.getElementById('confirmReadingBtn').addEventListener('click', () => {
-      document.getElementById('readingModal').style.display = 'none';
-      document.getElementById('getReadingBtn').click();
-    });
+          getGeoData((err, pos) => {
+            if (!err && pos) {
+              const userLat = pos.coords.latitude;
+              const userLon = pos.coords.longitude;
+              const goalLat = currentGoal.lat;
+              const goalLon = currentGoal.lon;
+
+              const bearing = calculateBearing(
+                userLat,
+                userLon,
+                goalLat,
+                goalLon
+              );
+
+              const distance = haversineDistance(
+                userLat,
+                userLon,
+                goalLat,
+                goalLon
+              );
+
+              updateArrow(bearing);
+
+              const distanceBox = document.getElementById('distanceBox');
+              distanceBox.textContent = `Distance to goal: ${distance.toFixed(1)} meters`;
+            }
+          });
+        }
+      }
+    }
+
+    function calculateBearing(lat1, lon1, lat2, lon2) {
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      lat1 = lat1 * Math.PI / 180;
+      lat2 = lat2 * Math.PI / 180;
+      const y = Math.sin(dLon) * Math.cos(lat2);
+      const x = Math.cos(lat1) * Math.sin(lat2) -
+                Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+      let brng = Math.atan2(y, x);
+      brng = brng * 180 / Math.PI;
+      return (brng + 360) % 360;
+    }
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // radius of Earth in meters
+      const toRad = angle => angle * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) *
+          Math.cos(toRad(lat2)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
 
     function generateMockSensorData() {
-      const VWC = parseFloat(document.getElementById("VMCInput").value)
-      const TEMP = (Math.random() * 40).toFixed(2);
-      const EC = (Math.random() * 10000).toFixed(0);
-      const data = `${VWC},${TEMP},${EC}`;
+      const vmc = document.getElementById('VMCInput').value || "1";
+      const ec = (Math.random() * 2000).toFixed(2);
+      const temp = (20 + Math.random() * 10).toFixed(2);
+      const mockData = `${vmc},${temp},${ec}`;
       const encoder = new TextEncoder();
       const fakeEvent = {
         target: {
-          value: encoder.encode(data)
+          value: encoder.encode(mockData)
         }
       };
       handleSensorData(fakeEvent);
     }
 
-    // NEW CODE TO CONTINUOUSLY UPDATE CURRENT POSITION
-    function startWatchingPosition() {
-      if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(
-          (position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            document.getElementById("currentPosition").innerText =
-              `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-          },
-          (error) => {
-            console.error("Error watching position:", error);
-          },
-          {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 10000
-          }
-        );
-      } else {
-        console.error("Geolocation is not supported in this browser.");
-      }
-    }
+    document.getElementById('enableCompassBtn').addEventListener('click', () => {
+      setupDeviceOrientation();
+      document.getElementById('enableCompassBtn').style.display = 'none';
+    });
 
-    // Start watching position when page loads
-    startWatchingPosition();
-
-  </script>
-
+    setInterval(updateMeasurementStatus, 5000);
+</script>
 </body>
 </html>
-
