@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, render_template_string
 from flask_cors import CORS
 from new_kriging_traverse import visualize_initial_state, create_grid_around_robot1, run_multi_robot_exploration_with_visualization
 import matplotlib.pyplot as plt
@@ -146,15 +146,25 @@ def get_goal(device_id):
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/clear", methods=["DELETE"])
-def clear_sensor_data():
+@app.route('/clear', methods=['GET'])
+def clear_confirmation():
+    """Renders a page asking for user confirmation."""
+    return render_template_string('''
+        <h2>Are you sure you want to delete all entries?</h2>
+        <form action="{{ url_for('clear_confirmed') }}" method="POST">
+            <button type="submit">Yes, delete everything</button>
+        </form>
+        <a href="/">Cancel</a>
+    ''')
+
+@app.route('/clear/confirm', methods=['POST'])
+def clear_confirmed():
     try:
         open(DATA_FILE_NAME, "w").close()
-        print("Sensor data file cleared")
-        return jsonify({"msg": "Sensor data file cleared"})
+        open("db.txt", "w").close()
+        return jsonify({"msg": "Both files cleared"})
     except Exception as e:
-        print(f"Error clearing file: {e}")
-        return jsonify({"msg": "Error clearing file"}), 500
+        return jsonify({"msg": f"Error clearing files: {e}"}), 500
 
 
 
