@@ -313,6 +313,59 @@ function generateMockSensorData() {
   handleSensorData(fakeEvent);
 }
 
+// When the compass arrow is clicked, show a satellite map
+document.querySelector('.arrow-container').addEventListener('click', async () => {
+  const arrowContainer = document.querySelector('.arrow-container');
+  arrowContainer.style.display = 'none'; // Hide the compass
+  document.getElementById('map').style.display = 'block'; // Show the map div
+
+  // Get current position again to ensure up to date
+  getGeoData(async (geoError, position) => {
+    if (geoError) {
+      console.error("Geolocation error:", geoError);
+      return;
+    }
+    const currentLat = position.coords.latitude;
+    const currentLon = position.coords.longitude;
+
+    const goal = await fetchGoalForDevice(deviceID);
+    if (!goal) {
+      console.error("Goal not available");
+      return;
+    }
+    const goalLat = goal.lat;
+    const goalLon = goal.lon;
+
+    // Initialize Leaflet map
+    const map = L.map('map').setView([currentLat, currentLon], 20); // zoom 20: very close range
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 22,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Add satellite layer (Esri satellite)
+    const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      attribution: 'Tiles &copy; Esri'
+    }).addTo(map);
+
+    // Markers
+    const currentMarker = L.marker([currentLat, currentLon]).addTo(map);
+    currentMarker.bindPopup("<b>Your Location</b>").openPopup();
+
+    const goalMarker = L.marker([goalLat, goalLon]).addTo(map);
+    goalMarker.bindPopup("<b>Goal Location</b>");
+
+    // Fit bounds tightly around both points
+    const bounds = L.latLngBounds([
+      [currentLat, currentLon],
+      [goalLat, goalLon]
+    ]).pad(0.3);
+    map.fitBounds(bounds);
+  });
+});
+
+
 // Start updates
 startLocationTracking();
 setInterval(updateMeasurementStatus, 5000);
