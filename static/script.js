@@ -243,7 +243,7 @@ function updateReadingStatus(distance) {
     readingStatusBox.style.color = "#155724";
     readingStatusBox.style.borderColor = "#c3e6cb";
   } else {
-    readingStatusBox.textContent = "🚶 Traveling toward goal...";
+    readingStatusBox.textContent = "🚶 Need to travel closer to your goal. Do not take reading";
     readingStatusBox.style.backgroundColor = "#f0f8ff";
     readingStatusBox.style.color = "#004085";
     readingStatusBox.style.borderColor = "#b8daff";

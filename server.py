@@ -34,18 +34,22 @@ def get_different_last_values(file_path):
                     last_values.add(last_value)
                     different_entries.append(line.strip())  # Store the entire line
     return different_entries
-
+run_init_once = False
+grid_X, grid_Y = None,None;
 def run_kriging_with_status():
     """Wrapper to run kriging traverse and update status flag."""
     global kriging_status
     global run_kriging_traverse_call_count
+    global run_init_once
+    global grid_X 
+    global grid_Y
     print("Starting kriging traversal process...")
     kriging_status["running"] = True
     if (len(get_different_last_values("sensorData.txt"))>=3):
         try:
             # Define the grid size and cell size
             # Example run
-            grid_size = 3
+            grid_size = 11
             robot_vmc_values = []
             robot_positions = []
             lowest_entries = {}
@@ -64,7 +68,9 @@ def run_kriging_with_status():
                 lat = float(values[4])
                 robot_positions.append((lon,lat))
                 robot_vmc_values.append(vmc)
-            grid_X, grid_Y = create_grid_around_robot1(robot_positions[0], grid_size, cell_size)
+            if not run_init_once:
+                grid_X, grid_Y = create_grid_around_robot1(robot_positions[0], grid_size, cell_size)
+                run_init_once = True
             _ ,Zhat = run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions.copy(), robot_vmc_values.copy(), num_iterations=3)
             visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size)   
         except Exception as e:
