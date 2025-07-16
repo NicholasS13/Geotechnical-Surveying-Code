@@ -36,6 +36,8 @@ def get_different_last_values(file_path):
     return different_entries
 run_init_once = False
 grid_X, grid_Y = None,None;
+
+run_kriging_counter = 0
 def run_kriging_with_status():
     """Wrapper to run kriging traverse and update status flag."""
     global kriging_status
@@ -43,6 +45,8 @@ def run_kriging_with_status():
     global run_init_once
     global grid_X 
     global grid_Y
+    global run_kriging_counter
+    run_kriging_counter = run_kriging_counter+1
     print("Starting kriging traversal process...")
     kriging_status["running"] = True
     if (len(get_different_last_values("sensorData.txt"))>=3):
@@ -71,7 +75,7 @@ def run_kriging_with_status():
             if not run_init_once:
                 grid_X, grid_Y = create_grid_around_robot1(robot_positions[0], grid_size, cell_size)
                 run_init_once = True
-            _ ,Zhat = run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions.copy(), robot_vmc_values.copy(), num_iterations=3)
+            _ ,Zhat = run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions.copy(), robot_vmc_values.copy(), num_iterations=run_kriging_counter)
             visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size)   
         except Exception as e:
             print(f"Kriging traverse failed: {e}")

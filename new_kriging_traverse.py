@@ -192,21 +192,22 @@ def run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positio
     # Initialize visited_cells with starting positions
     for path in robot_paths:
         visited_cells.add(path[0])
-    for step in range(num_iterations):
-        print(f"\n=== Iteration {step + 1} ===")
-        Zhat, Zvar = perform_kriging_from_vmc_points(robot_positions, robot_vmc_values, grid_X, grid_Y)
-        closeness_center_map = compute_closeness_to_center_map(grid_X, grid_Y)
-        for i in range(num_robots):
-            curr_idx = robot_paths[i][-1]
-            robot_pos = (grid_X[curr_idx], grid_Y[curr_idx])
-            closeness_robot_map = compute_closeness_to_robot_map(grid_X, grid_Y, robot_pos)
-            dist_to_robot_map = np.sqrt((grid_X - robot_pos[0])**2 + (grid_Y - robot_pos[1])**2)
-            score_map = compute_score_map(Zhat, Zvar, closeness_center_map, closeness_robot_map, dist_to_robot_map)
-            new_idx = move_one_step_a_star(score_map, grid_X, grid_Y, curr_idx, visited_cells)
-            robot_paths[i].append(new_idx)
-            visited_cells.add(new_idx)  # Mark as visited
-            new_pos = (grid_X[new_idx], grid_Y[new_idx])
-            print(f"Robot {i+1} moved to: {new_pos}")
-            add_or_update_robot_position(i, new_pos[0], new_pos[1])
-        visualize_robot_paths(grid_X, grid_Y, robot_paths, Zhat, step, cell_size=cell_size)
+    #for step in range(num_iterations):
+    step = num_iterations-1
+    print(f"\n=== Iteration {step + 1} ===")
+    Zhat, Zvar = perform_kriging_from_vmc_points(robot_positions, robot_vmc_values, grid_X, grid_Y)
+    closeness_center_map = compute_closeness_to_center_map(grid_X, grid_Y)
+    for i in range(num_robots):
+        curr_idx = robot_paths[i][-1]
+        robot_pos = (grid_X[curr_idx], grid_Y[curr_idx])
+        closeness_robot_map = compute_closeness_to_robot_map(grid_X, grid_Y, robot_pos)
+        dist_to_robot_map = np.sqrt((grid_X - robot_pos[0])**2 + (grid_Y - robot_pos[1])**2)
+        score_map = compute_score_map(Zhat, Zvar, closeness_center_map, closeness_robot_map, dist_to_robot_map)
+        new_idx = move_one_step_a_star(score_map, grid_X, grid_Y, curr_idx, visited_cells)
+        robot_paths[i].append(new_idx)
+        visited_cells.add(new_idx)  # Mark as visited
+        new_pos = (grid_X[new_idx], grid_Y[new_idx])
+        print(f"Robot {i+1} moved to: {new_pos}")
+        add_or_update_robot_position(i, new_pos[0], new_pos[1])
+    visualize_robot_paths(grid_X, grid_Y, robot_paths, Zhat, step, cell_size=cell_size)
     return robot_paths, Zhat
