@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WebBLE Sensor Data</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+  <!--Favicon.ico static references-->
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+  <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='android-chrome-512x512.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+
+</head>
+<body>
+
+  <h1>ESP32 S3 Feather Sensor Data</h1>
+
+  <!-- Measurement status -->
+  <div id="measurementStatus">Loading measurement status...</div>
+
+  <!-- Goal/reached reading status display instead of modal -->
+  <div id="readingStatusBox" class="reading-status">
+    <!-- Updated dynamically with JS -->
+    Waiting for Goal Location
+  </div>
+
+  <div id="loading">Loading Kriging Traverse...</div>
+
+  <button id="enableCompassBtn">Enable Compass</button>
+
+  <div class="arrow-container" title="Arrow points towards goal">
+    <svg id="arrow" class="arrow-svg" viewBox="0 0 100 100" width="100" height="100">
+      <polygon points="50,10 90,90 50,70 10,90" fill="red"/>
+    </svg>
+  </div>
+
+  <div id="map" style="display:none;"></div>
+
+  <div class="position-info">
+    <h3>Goal Position (Device <span id="mainDeviceId">-</span>)</h3>
+    <p id="goalPosition">Lat: —, Lon: —</p>
+    <h3>Current Position</h3>
+    <p id="currentPosition">Lat: —, Lon: —</p>
+  </div>
+
+  <div id="distanceBox" class="distance-box">
+    Distance to goal: —
+  </div>
+
+  <!-- Optional list (still hidden by default) -->
+  <div class="goal-list" id="allGoalPositions">
+    <h3>All Devices Goal Positions</h3>
+    <div id="goalDevice0" class="goal-item">Device 0: Lat: —, Lon: —</div>
+    <div id="goalDevice1" class="goal-item">Device 1: Lat: —, Lon: —</div>
+    <div id="goalDevice2" class="goal-item">Device 2: Lat: —, Lon: —</div>
+  </div>
+
+  <button id="cannotgo">Can Not Go forward</button>
+  <button id="connect">Connect to ESP32</button>
+  <input id="commandInput" placeholder="Enter command"/>
+  <button id="submitCommandBtn">Submit Command</button>
+  <button id="getReadingBtn">Get Reading</button>
+  <input id="VMCInput" placeholder="Enter VMC"/>
+
+  <div id="sensorData">
+    <div class="value-box">VWC: <span id="value1"></span></div>
+    <div class="value-box">Temp: <span id="value2"></span></div>
+    <div class="value-box">EC: <span id="value3"></span></div>
+  </div>
+
+  <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
+  <div id="sensorDataHistory"></div>
+  <div id="coordinateDIV" style="display: none;"></div>
+
+  <script src="{{ url_for('static', filename='script2.js') }}"></script>
+</body>
+</html>
