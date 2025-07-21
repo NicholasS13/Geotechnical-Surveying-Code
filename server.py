@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import multiprocessing
 import threading
 import os
-import collections
 
 app = Flask(__name__)
 CORS(app)
@@ -35,74 +34,54 @@ def get_different_last_values(file_path):
                     last_values.add(last_value)
                     different_entries.append(line.strip())  # Store the entire line
     return different_entries
-
 run_init_once = False
 grid_X, grid_Y = None,None;
-run_init_once = False
-grid_X, grid_Y = None, None
+
 run_kriging_counter = 0
-iteration_counter = 0
 def run_kriging_with_status():
-    """Wrapper to run kriging traverse and update status flag when all robots have submitted for current iteration."""
+    """Wrapper to run kriging traverse and update status flag."""
     global kriging_status
     global run_kriging_traverse_call_count
     global run_init_once
-    global grid_X, grid_Y
+    global grid_X 
+    global grid_Y
     global run_kriging_counter
-    global iteration_counter
-
+    run_kriging_counter = run_kriging_counter+1
     print("Starting kriging traversal process...")
     kriging_status["running"] = True
-    try:
-        # Read and parse sensor data
-        with open('sensorData.txt', 'r') as file:
-            lines = [line.strip().split(',') for line in file if line.strip()]
-
-        # Group lines by device ID (last column)
-        device_entries = collections.defaultdict(list)
-        for values in lines:
-            device_id = values[-1]
-            device_entries[device_id].append(values)
-
-        # Check that we have at least 3 devices and each has enough entries for this iteration
-        if len(device_entries) >= 3 and all(len(entries) > iteration_counter for entries in device_entries.values()):
-            robot_positions = []
+    if (len(get_different_last_values("sensorData.txt"))>=3):
+        try:
+            # Define the grid size and cell size
+            # Example run
+            grid_size = 11
             robot_vmc_values = []
-
-            for device_id in sorted(device_entries.keys()):
-                values = device_entries[device_id][iteration_counter]
+            robot_positions = []
+            lowest_entries = {}
+            with open('sensorData.txt', 'r') as file:
+                for line in file:
+                    values = line.strip().split(',')
+                    # Get the unique value at index -1
+                    unique_value = values[-1]
+                    # Convert VMC to float for comparison
+                    vmc = float(values[0])
+                    lowest_entries[unique_value] = (vmc, values)
+            # Now process the latest unique entries (each individual device)
+            for _, values in lowest_entries.values():# _ is the
                 vmc = float(values[0])
                 lon = float(values[3])
                 lat = float(values[4])
-                robot_positions.append((lon, lat))
+                robot_positions.append((lon,lat))
                 robot_vmc_values.append(vmc)
-
-            # Initialize grid if this is the first run
             if not run_init_once:
-                grid_size = 11
                 grid_X, grid_Y = create_grid_around_robot1(robot_positions[0], grid_size, cell_size)
                 run_init_once = True
-
-            # Run kriging
-            run_kriging_counter += 1
-            _, Zhat = run_multi_robot_exploration_with_visualization(
-                grid_X, grid_Y,
-                robot_positions.copy(),
-                robot_vmc_values.copy(),
-                num_iterations=run_kriging_counter
-            )
-
-            visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size)
-            print(f"Iteration {iteration_counter + 1} kriging completed.")
-            iteration_counter += 1  # Advance to next round
-        else:
-            print("Not all robots have submitted measurements for this iteration yet.")
-
-    except Exception as e:
-        print(f"Kriging traverse failed: {e}")
-    finally:
-        kriging_status["running"] = False
-        print("Kriging traversal completed.")
+            _ ,Zhat = run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions.copy(), robot_vmc_values.copy(), num_iterations=run_kriging_counter)
+            visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size)   
+        except Exception as e:
+            print(f"Kriging traverse failed: {e}")
+        finally:
+            kriging_status["running"] = False
+            print("Kriging traversal completed.")
 
 
 @app.route("/sendSensorValues", methods=["POST"])
@@ -203,10 +182,6 @@ def clear_confirmed():
 def webble_api():
     return render_template("webble.html")
 
-#for BLE Comms mock
-@app.route("/webble2", methods=["GET"])
-def webble2_api():
-    return render_template("webblewithBLEMock.html")
 
 def run_ngrok():
     command = 'ngrok http --url=awaited-definite-cockatoo.ngrok-free.app 8080'
