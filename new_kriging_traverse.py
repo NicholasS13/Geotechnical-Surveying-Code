@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pykrige.ok import OrdinaryKriging
 import heapq
+import ast
 cell_size=0.00012
-
 # Load existing entries from db.txt to avoid duplicates
 def read_existing_robot_ids(filepath="db.txt"):
     existing_ids = set()
@@ -60,6 +60,7 @@ def insert_vmc_into_map(vmc_map, grid_X, grid_Y, robot_position, vmc_value):
     vmc_map[row, col] = vmc_value
     return (row, col)
 def visualize_robot_paths(grid_X, grid_Y, robot_paths, Zhat, step, cell_size):
+    global plt_counter
     fig, ax = plt.subplots(figsize=(7, 6))
     im = ax.imshow(Zhat, origin="lower", cmap="YlOrRd", extent=[
         grid_X[0, 0] - cell_size / 2, grid_X[0, -1] + cell_size / 2,
@@ -86,6 +87,9 @@ def visualize_robot_paths(grid_X, grid_Y, robot_paths, Zhat, step, cell_size):
     fig.colorbar(im, ax=ax, label="Kriging Zhat (Expected Value)")
     plt.tight_layout()
     plt.show()
+    plt.savefig(f"figures/{plt_counter}.png") 
+    plt_counter+=1
+    plt.close()
 # Kriging function
 def perform_kriging_from_vmc_points(robot_positions, robot_vmc_values, grid_X, grid_Y):
     x_known = np.array([p[0] for p in robot_positions])
@@ -122,7 +126,9 @@ def a_star_path(grid_X, grid_Y, score_map, start_idx, goal_idx, visited_cells):
     heapq.heappush(open_set, (0, start_idx))
     came_from = {}
     g_score = {start_idx: 0}
-    def h(a, b): return np.linalg.norm(np.array(a) - np.array(b))
+    def h(a, b):
+        # Chebyshev distance for 8-connected grid
+        return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
     while open_set:
         _, current = heapq.heappop(open_set)
         if current == goal_idx:
@@ -133,12 +139,14 @@ def a_star_path(grid_X, grid_Y, score_map, start_idx, goal_idx, visited_cells):
             return path[::-1]
         for d_i in [-1, 0, 1]:
             for d_j in [-1, 0, 1]:
-                if abs(d_i) + abs(d_j) != 1: continue  # only 4-connected
+                if d_i == 0 and d_j == 0:
+                    continue  # Skip the current cell itself
                 neighbor = (current[0] + d_i, current[1] + d_j)
                 if (0 <= neighbor[0] < rows and
                     0 <= neighbor[1] < cols and
                     neighbor not in visited_cells):  # Skip visited cells
-                    tentative_g = g_score[current] + 1
+                    step_cost = np.hypot(d_i, d_j)  # 1 for straight, √2 for diagonal
+                    tentative_g = g_score[current] + step_cost
                     if neighbor not in g_score or tentative_g < g_score[neighbor]:
                         g_score[neighbor] = tentative_g
                         f = tentative_g + h(neighbor, goal_idx)
@@ -158,6 +166,7 @@ def move_one_step_a_star(score_map, grid_X, grid_Y, current_idx, visited_cells):
         return path[1]
     return current_idx
 def visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size):
+    global plt_counter
     fig, ax = plt.subplots(figsize=(7, 6))
     im = ax.imshow(Zhat, origin="lower", cmap="YlOrRd", extent=[
         grid_X[0, 0] - cell_size / 2, grid_X[0, -1] + cell_size / 2,
@@ -184,30 +193,44 @@ def visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size):
     ax.legend()
     fig.colorbar(im, ax=ax, label="Kriging Zhat (Expected Value)")
     plt.tight_layout()
+    plt.savefig(f"figures/{plt_counter}.png")
     plt.show()
-def run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions, robot_vmc_values, num_iterations=3, cell_size=cell_size):
+    plt_counter+=1
+    plt.close()
+plt_counter = 0;
+def run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions, robot_vmc_values,cell_size,robot_positions_1,robot_vmc_values_1,num_iterations=0):
+    visited_cells = set() # Track all visited cells
+    #reads all saved ones from file
+    with open('points.txt', 'r') as f:
+        points = {ast.literal_eval(line.strip()) for line in f}
+        visited_cells.update(points)# adds all points from file to visited cells
+    
     num_robots = len(robot_positions)
     robot_paths = [[get_nearest_grid_cell(grid_X, grid_Y, pos)] for pos in robot_positions]
-    visited_cells = set()  # Track all visited cells
+    
     # Initialize visited_cells with starting positions
     for path in robot_paths:
         visited_cells.add(path[0])
-    #for step in range(num_iterations):
-    step = num_iterations-1
-    print(f"\n=== Iteration {step + 1} ===")
-    Zhat, Zvar = perform_kriging_from_vmc_points(robot_positions, robot_vmc_values, grid_X, grid_Y)
-    closeness_center_map = compute_closeness_to_center_map(grid_X, grid_Y)
-    for i in range(num_robots):
-        curr_idx = robot_paths[i][-1]
-        robot_pos = (grid_X[curr_idx], grid_Y[curr_idx])
-        closeness_robot_map = compute_closeness_to_robot_map(grid_X, grid_Y, robot_pos)
-        dist_to_robot_map = np.sqrt((grid_X - robot_pos[0])**2 + (grid_Y - robot_pos[1])**2)
-        score_map = compute_score_map(Zhat, Zvar, closeness_center_map, closeness_robot_map, dist_to_robot_map)
-        new_idx = move_one_step_a_star(score_map, grid_X, grid_Y, curr_idx, visited_cells)
-        robot_paths[i].append(new_idx)
-        visited_cells.add(new_idx)  # Mark as visited
-        new_pos = (grid_X[new_idx], grid_Y[new_idx])
-        print(f"Robot {i+1} moved to: {new_pos}")
-        add_or_update_robot_position(i, new_pos[0], new_pos[1])
-    visualize_robot_paths(grid_X, grid_Y, robot_paths, Zhat, step, cell_size=cell_size)
+
+    for step in range(num_iterations):
+        print(f"\n=== Iteration {step + 1} ===")
+        Zhat, Zvar = perform_kriging_from_vmc_points(robot_positions_1, robot_vmc_values_1, grid_X, grid_Y)
+        closeness_center_map = compute_closeness_to_center_map(grid_X, grid_Y)
+        for i in range(num_robots):
+            curr_idx = robot_paths[i][-1]
+            robot_pos = (grid_X[curr_idx], grid_Y[curr_idx])
+            closeness_robot_map = compute_closeness_to_robot_map(grid_X, grid_Y, robot_pos)
+            dist_to_robot_map = np.sqrt((grid_X - robot_pos[0])**2 + (grid_Y - robot_pos[1])**2)
+            score_map = compute_score_map(Zhat, Zvar, closeness_center_map, closeness_robot_map, dist_to_robot_map)
+            new_idx = move_one_step_a_star(score_map, grid_X, grid_Y, curr_idx, visited_cells)
+            robot_paths[i].append(new_idx)
+            visited_cells.add(new_idx)  # Mark as visited
+            new_pos = (grid_X[new_idx], grid_Y[new_idx])
+            print(f"Robot {i+1} moved to: {new_pos}")
+            add_or_update_robot_position(i, new_pos[0], new_pos[1])
+
+        with open('points.txt', 'w') as f:
+            for point in visited_cells:
+                f.write(repr(point) + '\n')
+        visualize_robot_paths(grid_X, grid_Y, robot_paths, Zhat, step, cell_size=cell_size)
     return robot_paths, Zhat

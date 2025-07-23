@@ -62,12 +62,14 @@
   </div>
 
   <button id="cannotgo">Can Not Go forward</button>
-  <button id="connect">Connect to ESP32</button>
+  <button id="connect">Connect to ESP32</button> 
+  <button onclick="sendPosition()">Save Grid</button>
   <input id="commandInput" placeholder="Enter command"/>
   <button id="submitCommandBtn">Submit Command</button>
   <button id="getReadingBtn">Get Reading</button>
   <input id="VMCInput" placeholder="Enter VMC"/>
-
+  <p>Estimated zHat: <span id="zHatValue">—</span></p>
+  <ul id="pointsList"></ul>
   <div id="sensorData">
     <div class="value-box">VWC: <span id="value1"></span></div>
     <div class="value-box">Temp: <span id="value2"></span></div>

@@ -6,10 +6,14 @@ import matplotlib.pyplot as plt
 import multiprocessing
 import threading
 import os
+import numpy as np
 
 app = Flask(__name__)
 CORS(app)
-cell_size=0.00012
+cell_size=0.0001
+
+Zhat = None
+
 
 device_count = 0
 DATA_FILE_NAME = "sensorData.txt"
@@ -19,7 +23,6 @@ kriging_status = {
     "running": False
 }
 
-run_kriging_traverse_call_count=0;
 
 def get_different_last_values(file_path):
     last_values = set()
@@ -41,10 +44,10 @@ run_kriging_counter = 0
 def run_kriging_with_status():
     """Wrapper to run kriging traverse and update status flag."""
     global kriging_status
-    global run_kriging_traverse_call_count
     global run_init_once
-    global grid_X 
-    global grid_Y
+    global Zhat
+    #global grid_X 
+    #global grid_Y
     global run_kriging_counter
     run_kriging_counter = run_kriging_counter+1
     print("Starting kriging traversal process...")
@@ -56,6 +59,8 @@ def run_kriging_with_status():
             grid_size = 11
             robot_vmc_values = []
             robot_positions = []
+            robot_positions_1 = []
+            robot_vmc_values_1 = []
             lowest_entries = {}
             with open('sensorData.txt', 'r') as file:
                 for line in file:
@@ -65,17 +70,23 @@ def run_kriging_with_status():
                     # Convert VMC to float for comparison
                     vmc = float(values[0])
                     lowest_entries[unique_value] = (vmc, values)
+                    
+                    #adds all robot vmc and coordinate values
+                    robot_positions_1.append((values[4], float(values[3])))
+                    robot_vmc_values_1.append(vmc)
             # Now process the latest unique entries (each individual device)
             for _, values in lowest_entries.values():# _ is the
                 vmc = float(values[0])
                 lon = float(values[3])
                 lat = float(values[4])
-                robot_positions.append((lon,lat))
+                robot_positions.append((lat, lon))
                 robot_vmc_values.append(vmc)
-            if not run_init_once:
-                grid_X, grid_Y = create_grid_around_robot1(robot_positions[0], grid_size, cell_size)
-                run_init_once = True
-            _ ,Zhat = run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions.copy(), robot_vmc_values.copy(), num_iterations=run_kriging_counter)
+            #if not run_init_once:
+            grid_X = np.load('grid_X.npy')
+            grid_Y = np.load('grid_Y.npy')
+                #grid_X, grid_Y = create_grid_around_robot1(robot_positions[0], grid_size, cell_size)
+            #    run_init_once = True
+            _ ,Zhat = run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions.copy(), robot_vmc_values.copy(), cell_size, robot_positions_1,robot_vmc_values_1, num_iterations=0)
             visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size)   
         except Exception as e:
             print(f"Kriging traverse failed: {e}")
@@ -83,7 +94,32 @@ def run_kriging_with_status():
             kriging_status["running"] = False
             print("Kriging traversal completed.")
 
+@app.route('/save_grid', methods=['POST'])
+def save_grid():
+    global cell_size
+    try:
+        data = request.get_json()
+        if not data or 'lat' not in data or 'lon' not in data:
+            return jsonify({'error': 'Missing lat or lon in JSON'}), 400
+        
+        # Parse floats safely
+        lat = float(data['lat'])
+        lon = float(data['lon'])
+        
+        # Pass coordinates in (lat, lon) order if that's what create_grid_around_robot1 expects
+        #grid_X, grid_Y = create_grid_around_robot1((lat, lon), 11, cell_size)
+        
+        grid_X, grid_Y = create_grid_around_robot1((lat, lon), 11, cell_size)
 
+        # Save as npy files or serialize as JSON lists (not recommended for very large arrays)
+        np.save('grid_X.npy', grid_X)
+        np.save('grid_Y.npy', grid_Y)
+            
+        return jsonify({"grid_X": grid_X, "grid_Y": grid_Y})
+    except Exception as e:
+        print(f"Exception in /save_grid: {e}")  # Logs error to your Flask console
+        return jsonify({'error': str(e)}), 500
+    
 @app.route("/sendSensorValues", methods=["POST"])
 def send_sensor_values():
     global device_count
@@ -144,8 +180,8 @@ def get_goal(device_id):
             for line in f:
                 fields = line.strip().split(",")
                 if fields[0] == str(device_id):
-                    lon = float(fields[1])
-                    lat = float(fields[2])
+                    lon = float(fields[2])
+                    lat = float(fields[1])
                     goal_data = {"lon": lon, "lat": lat}
                     break
         if goal_data:
@@ -172,11 +208,21 @@ def clear_confirmed():
     try:
         open(DATA_FILE_NAME, "w").close()
         open("db.txt", "w").close()
+        open("points.txt",'w').close()
         return jsonify({"msg": "Both files cleared"})
     except Exception as e:
         return jsonify({"msg": f"Error clearing files: {e}"}), 500
 
-
+@app.route('/get_zhat')
+def get_zhat():
+    global Zhat
+    return jsonify({'zHat': Zhat})
+@app.route("/get_visited_cells", methods=["GET"])
+def get_visited():
+    points = set()
+    with open('points.txt', 'r') as f:
+        points = {ast.literal_eval(line.strip()) for line in f}
+    return jsonify({"Points": list(points)})
 
 @app.route("/webble", methods=["GET"])
 def webble_api():

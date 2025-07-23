@@ -364,8 +364,52 @@ document.querySelector('.arrow-container').addEventListener('click', async () =>
     map.fitBounds(bounds);
   });
 });
+function sendPosition() {
+    const text = document.getElementById('currentPosition').textContent;
+    const regex = /Lat:\s*(-?\d+\.?\d*), Lon:\s*(-?\d+\.?\d*)/;
+    const match = text.match(regex);
+    if (match) {
+        const lat = match[1];
+        const lon = match[2];
+        fetch('/save_grid', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({lat, lon})
+        }).then(response => response.json())
+          .then(data => alert('Grid saved: X=' + data.grid_X + ', Y=' + data.grid_Y));
+    } else {
+        alert('Could not find coordinates.');
+    }
+}
+async function fetchZHat() {
+  try {
+    const response = await fetch('/get_zhat');
+    const data = await response.json();
+    document.getElementById('zHatValue').textContent = data.zHat.toFixed(3);
+  } catch (error) {
+    console.error('Failed to fetch zHat:', error);
+  }
+}
+    async function loadVisitedCells() {
+      try {
+        const response = await fetch("/get_visited_cells");
+        const data = await response.json();
+        const points = data.Points;
 
+        const list = document.getElementById("pointsList");
+        list.innerHTML = "";
 
+        points.forEach((point) => {
+          const li = document.createElement("li");
+          li.textContent = point;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error("Failed to fetch points:", err);
+      }
+    }
+setInterval(fetchZHat, 2000);
+setInterval(loadVisitedCells, 2000);
 // Start updates
 startLocationTracking();
 setInterval(updateMeasurementStatus, 5000);
