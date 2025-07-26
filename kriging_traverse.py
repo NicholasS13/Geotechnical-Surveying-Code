@@ -4,10 +4,13 @@ import matplotlib.pyplot as plt
 from pykrige.ok import OrdinaryKriging
 import os
 import pickle
+import logging
 
 sensor_file = "sensor.txt"
 grid_x_file = "grid_X.npy"
 grid_y_file = "grid_Y.npy"
+
+logger = logging.getLogger("__main__")
 
 # --- Robot Class ---
 class Robot:
@@ -306,8 +309,8 @@ def run_traverse():
     grid_X = np.load(grid_x_file)
     grid_Y = np.load(grid_y_file)
     
-    print("Grid X ", grid_X)
-    print("Grid Y ", grid_Y)
+    logger.debug("Grid X ", grid_X)
+    logger.debug("Grid Y ", grid_Y)
     vmc_map = np.full_like(grid_X, np.nan)
     all_positions = []
     all_vmc = []
@@ -379,7 +382,7 @@ def run_traverse():
     
     
     # --- Step 13: Output ---
-    print("\n--- Robot Planning Results ---")
+    logger.debug("\n--- Robot Planning Results ---")
     for robot in robots:
-        print(robot)
-    print(visited_cells)
+        logger.debug(robot)
+    logger.debug(visited_cells)

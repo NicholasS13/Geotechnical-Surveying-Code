@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 from flask import Flask, request, jsonify, render_template, render_template_string
 from flask_cors import CORS
-from kriging_traverse import create_grid
+from kriging_traverse import *
 import multiprocessing
 import os
 import numpy as np
@@ -18,10 +18,10 @@ CORS(app)
 cell_size=0.0001
 
 Zhat = None
-
+robots:list = list()
 
 device_count = 0
-DATA_FILE_NAME = "sensorData.txt"
+DATA_FILE_NAME = "sensor.txt"
 
 sensor_file = "sensor.txt"
 grid_x_file = "grid_X.npy"
@@ -30,6 +30,7 @@ grid_y_file = "grid_Y.npy"
 kriging_status = {
     "running": False
 }
+grid_X, grid_Y = None,None;
 
 
 def get_different_last_values(file_path):
@@ -45,64 +46,106 @@ def get_different_last_values(file_path):
                     last_values.add(last_value)
                     different_entries.append(line.strip())  # Store the entire line
     return different_entries
-run_init_once = False
-grid_X, grid_Y = None,None;
+
 
 run_kriging_counter = 0
 def run_kriging_with_status():
     """Wrapper to run kriging traverse and update status flag."""
     global kriging_status
-    global run_init_once
-    global Zhat
-    #global grid_X 
-    #global grid_Y
-    global run_kriging_counter
-    run_kriging_counter = run_kriging_counter+1
-    print("Starting kriging traversal process...")
+    global DATA_FILE_NAME
+    global robots
+    logger.debug("Starting kriging traversal process...")
     kriging_status["running"] = True
-    if (len(get_different_last_values("sensorData.txt"))>=3):
+    
+    save_grid()
+    if len(get_different_last_values(DATA_FILE_NAME))>=3:
         try:
-            # Define the grid size and cell size
-            # Example run
-            grid_size = 11
-            robot_vmc_values = []
-            robot_positions = []
-            robot_positions_1 = []
-            robot_vmc_values_1 = []
-            lowest_entries = {}
-            with open('sensorData.txt', 'r') as file:
-                for line in file:
-                    values = line.strip().split(',')
-                    # Get the unique value at index -1
-                    unique_value = values[-1]
-                    # Convert VMC to float for comparison
-                    vmc = float(values[0])
-                    lowest_entries[unique_value] = (vmc, values)
-                    
-                    #adds all robot vmc and coordinate values
-                    robot_positions_1.append((values[4], float(values[3])))
-                    robot_vmc_values_1.append(vmc)
-            # Now process the latest unique entries (each individual device)
-            for _, values in lowest_entries.values():# _ is the
-                vmc = float(values[0])
-                lon = float(values[3])
-                lat = float(values[4])
-                robot_positions.append((lat, lon))
-                robot_vmc_values.append(vmc)
-            #if not run_init_once:
-            grid_X = np.load('grid_X.npy')
-            grid_Y = np.load('grid_Y.npy')
-                #grid_X, grid_Y = create_grid_around_robot1(robot_positions[0], grid_size, cell_size)
-            #    run_init_once = True
-            _ ,Zhat = run_multi_robot_exploration_with_visualization(grid_X, grid_Y, robot_positions.copy(), robot_vmc_values.copy(), cell_size, robot_positions_1,robot_vmc_values_1, num_iterations=0)
-            visualize_initial_state(grid_X, grid_Y, robot_positions, Zhat, cell_size)   
+            grid_X = np.load(grid_x_file)
+            grid_Y = np.load(grid_y_file)
+            
+            logger.debug("Grid X ", grid_X)
+            logger.debug("Grid Y ", grid_Y)
+            vmc_map = np.full_like(grid_X, np.nan)
+            all_positions = []
+            all_vmc = []
+            latest_robot_data = {}
+            visited_cells = set()
+            
+            with open(DATA_FILE_NAME, "r") as f:
+                for line in f:
+                    parts = line.strip().split(',')
+                    if len(parts) < 6 or parts[0].strip() == "":
+                        continue
+                    try:
+                        vmc = float(parts[0])
+                        lon = float(parts[3])
+                        lat = float(parts[4])
+                        robot_id = int(parts[-1])
+            
+                        # For kriging
+                        all_positions.append((lon, lat))
+                        all_vmc.append(vmc)
+            
+                        # Latest robot position
+                        latest_robot_data[robot_id] = Robot(robot_id, (lon, lat), vmc)
+            
+                        # Visited cell
+                        visited_cells.add(get_nearest_cell(grid_X, grid_Y, (lon, lat)))
+                    except:
+                        continue
+            # --- Step 7: Kriging and scoring ---
+            Zhat, Zvar = perform_kriging(all_positions, all_vmc, grid_X, grid_Y)
+            center_map = compute_closeness_to_center_map(grid_X, grid_Y)
+            shared_score =compute_shared_score_map(Zhat, Zvar, center_map,w_exp=1.0, w_var=1.0, w_center=0.1)
+            
+            # --- Step 8: Load previous goals ---
+            goals_file = "goals_file.txt"
+            if not os.path.exists(goals_file):
+                goal_dict = {}
+            else:
+                goal_dict = load_state(goals_file)
+                if not isinstance(goal_dict, dict):
+                    goal_dict = {}
+            
+            
+            # --- Step 9: Update robots with past goals ---
+            robots = list(latest_robot_data.values())
+            for robot in robots:
+                if robot.id in goal_dict:
+                    robot.goal_idx = goal_dict[robot.id]
+                    robot.goal = (grid_X[robot.goal_idx], grid_Y[robot.goal_idx])
+            
+            # --- Step 10: Apply visited mask ---
+            visited_mask = np.zeros_like(shared_score, dtype=bool)
+            for idx in visited_cells:
+                visited_mask[idx] = True
+            for robot in robots:
+                row, col = get_nearest_cell(grid_X, grid_Y, robot.pos)
+                robot.grid_idx = (row, col)  # this sets the start point for A*
+            # --- Step 11: Compute holistic map and assign goals ---
+            for robot in robots:
+                holistic_map = robot.compute_holistic_score_map(shared_score, grid_X, grid_Y)
+                goal, path, next_move = assign_goal_and_path_for_robot(
+                    robot, holistic_map, grid_X, grid_Y, visited_mask
+                )
+                goal_dict[robot.id] = robot.goal_idx
+            
+            # --- Step 12: Save goals and visited cells ---
+            save_state(goals_file, goal_dict)
+            
+            
+            
+            # --- Step 13: Output ---
+            logger.debug("\n--- Robot Planning Results ---")
+            for robot in robots:
+                logger.debug(robot)
+            logger.debug(visited_cells)
         except Exception as e:
-            print(f"Kriging traverse failed: {e}")
+            logger.debug(f"Kriging traverse failed: {e}")
         finally:
             kriging_status["running"] = False
-            print("Kriging traversal completed.")
+            logger.debug("Kriging traversal completed.")
 
-@app.route('/save_grid', methods=['POST'])
 def save_grid():
     global cell_size
     try:
@@ -121,7 +164,7 @@ def save_grid():
             
         return jsonify({"grid_X": grid_X, "grid_Y": grid_Y})
     except Exception as e:
-        print(f"Exception in /save_grid: {e}")  # Logs error to your Flask console
+        logger.debug(f"Exception in /save_grid: {e}")  # Logs error to your Flask console
         return jsonify({'error': str(e)}), 500
     
 @app.route("/sendSensorValues", methods=["POST"])
@@ -131,7 +174,7 @@ def send_sensor_values():
     value = data.get("sensorValue")
     device_id = data.get("deviceID")
 
-    print(f"Received value: {value} from device: {device_id}")
+    logger.debug(f"Received value: {value} from device: {device_id}")
 
     if device_id == -1:
         device_id = device_count
@@ -153,7 +196,7 @@ def send_sensor_values():
         p = multiprocessing.Process(target=run_kriging_with_status)
         p.start()
     else:
-        print("Kriging process already running. Skipping restart.")
+        logger.debug("Kriging process already running. Skipping restart.")
 
     return jsonify(response)
 
@@ -178,8 +221,10 @@ def get_kriging_status():
 @app.route("/getGoal/<int:device_id>", methods=["GET"])
 def get_goal(device_id):
     """Fetch lon/lat from db.txt for the specified robot/device."""
+    global robots
     goal_data = None
     try:
+        """
         with open("db.txt", "r") as f:
             for line in f:
                 fields = line.strip().split(",")
@@ -188,6 +233,9 @@ def get_goal(device_id):
                     lat = float(fields[1])
                     goal_data = {"lon": lon, "lat": lat}
                     break
+            """
+        temp = robots[device_id].next_pos
+        goal_data = {"lon": temp[0], "lat": temp[1]}
         if goal_data:
             return jsonify(goal_data)
         else:
@@ -240,8 +288,6 @@ def run_ngrok():
 
 def run_server():
     app.run(port=8080)
-
-def 
 
 if __name__ == "__main__":
     server_process = multiprocessing.Process(target=run_server)
