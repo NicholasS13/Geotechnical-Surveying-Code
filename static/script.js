@@ -181,7 +181,61 @@ function handleSensorData(event) {
       .catch(console.error);
   });
 }
+//Temp overrides for debugging
 
+function getCustomPosition() {
+  const lat = parseFloat(document.getElementById("latitudeInput").value);
+  const lon = parseFloat(document.getElementById("longitudeInput").value);
+
+  return {
+    coords: {
+      latitude: lat,
+      longitude: lon,
+      accuracy: 5,   // fixed value; adjust if you want
+      altitude: null,
+      altitudeAccuracy: null,
+      heading: null,
+      speed: null
+    },
+    timestamp: Date.now()
+  };
+}
+
+// Override getCurrentPosition
+navigator.geolocation.getCurrentPosition = function(success, error) {
+  const position = getCustomPosition();
+
+  if (!isNaN(position.coords.latitude) && !isNaN(position.coords.longitude)) {
+    success(position);
+  } else if (typeof error === "function") {
+    error({ code: 1, message: "No position set in input fields." });
+  }
+};
+
+// Override watchPosition
+navigator.geolocation.watchPosition = function(success, error) {
+  function dispatchPosition() {
+    const position = getCustomPosition();
+    if (!isNaN(position.coords.latitude) && !isNaN(position.coords.longitude)) {
+      success(position);
+    } else if (typeof error === "function") {
+      error({ code: 1, message: "No position set in input fields." });
+    }
+  }
+
+  // Hook up onchange listeners to live-update as fields change
+  document.getElementById("latitudeInput").addEventListener("input", dispatchPosition);
+  document.getElementById("longitudeInput").addEventListener("input", dispatchPosition);
+
+  // Optionally, dispatch once on call
+  dispatchPosition();
+
+  // Return a mock watch ID
+  return 1;
+};
+
+
+//end of temp overrides
 function getGeoData(callback) {
   if (!navigator.geolocation) {
     callback(new Error("Geolocation not supported"), null);
@@ -397,7 +451,7 @@ async function fetchZHat() {
         const points = data.Points;
 
         const list = document.getElementById("pointsList");
-        list.innerHTML = "";
+        list.innerHTML = "VISITED CELLS:\n";
 
         points.forEach((point) => {
           const li = document.createElement("li");

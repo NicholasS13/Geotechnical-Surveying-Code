@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 from flask import Flask, request, jsonify, render_template, render_template_string
 from flask_cors import CORS
-from new_kriging_traverse import visualize_initial_state, create_grid_around_robot1, run_multi_robot_exploration_with_visualization
-import matplotlib.pyplot as plt
+from kriging_traverse import create_grid
 import multiprocessing
-import threading
 import os
 import numpy as np
+import logging
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(filename='app.log', encoding='utf-8', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG)
+logger.debug('This message should go to the log file')
+logger.info('So should this')
+logger.warning('And this, too')
+logger.error('And non-ASCII stuff, too, like Øresund and Malmö')
 app = Flask(__name__)
 CORS(app)
 cell_size=0.0001
@@ -18,6 +23,9 @@ Zhat = None
 device_count = 0
 DATA_FILE_NAME = "sensorData.txt"
 
+sensor_file = "sensor.txt"
+grid_x_file = "grid_X.npy"
+grid_y_file = "grid_Y.npy"
 # Global status dictionary (could also be stored in a file or DB)
 kriging_status = {
     "running": False
@@ -98,22 +106,18 @@ def run_kriging_with_status():
 def save_grid():
     global cell_size
     try:
-        data = request.get_json()
-        if not data or 'lat' not in data or 'lon' not in data:
-            return jsonify({'error': 'Missing lat or lon in JSON'}), 400
-        
-        # Parse floats safely
-        lat = float(data['lat'])
-        lon = float(data['lon'])
-        
-        # Pass coordinates in (lat, lon) order if that's what create_grid_around_robot1 expects
-        #grid_X, grid_Y = create_grid_around_robot1((lat, lon), 11, cell_size)
-        
-        grid_X, grid_Y = create_grid_around_robot1((lat, lon), 11, cell_size)
+        with open(sensor_file, 'r') as f:
+            first_line = f.readline().strip().split(',')
+            lon = float(first_line[3])
+            lat = float(first_line[4])
+            initial_pos = (lon, lat)
 
-        # Save as npy files or serialize as JSON lists (not recommended for very large arrays)
-        np.save('grid_X.npy', grid_X)
-        np.save('grid_Y.npy', grid_Y)
+        # --- Step 2: Create grid around initial position ---
+        grid_X1, grid_Y1 = create_grid(initial_pos, grid_size=11, cell_size_lat=0.00012)
+
+        # --- Step 3: Save to disk ---
+        np.save(grid_x_file, grid_X1)
+        np.save(grid_y_file, grid_Y1)
             
         return jsonify({"grid_X": grid_X, "grid_Y": grid_Y})
     except Exception as e:
@@ -237,7 +241,7 @@ def run_ngrok():
 def run_server():
     app.run(port=8080)
 
-
+def 
 
 if __name__ == "__main__":
     server_process = multiprocessing.Process(target=run_server)
