@@ -76,6 +76,21 @@
     <div class="value-box">EC: <span id="value3"></span></div>
   </div>
 
+  <div>
+    <label for="robotIdInput">View Plots for Robot ID:</label>
+    <input type="number" id="robotIdInput" placeholder="robotID if you want to view diff device's plots e.g., 2" />
+    <button onclick="updateRobotPlots()">Fetch Alt Images</button>
+  </div>
+
+  <!-- Holistic Score Plot -->
+  <h3>Latest Holistic Score Map for Robot <span id="holisticRobotId">2</span></h3>
+  <img id="holisticPlot" src="/latest-holistic-plot/2" alt="No Holostic Score Map Plots Yet"style="width: 600px; border: 1px solid #ccc;" />
+
+  <!-- Path to Goal Plot -->
+  <h3>Latest Path to Goal Map for Robot <span id="pathRobotId">2</span></h3>
+  <img id="pathPlot" src="/latest-path-plot/2" alt="No Robot Path Images Yet" style="width: 600px; border: 1px solid #ccc;" />
+
+  
   <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
   <div id="sensorDataHistory"></div>
   <div id="coordinateDIV" style="display: none;"></div>

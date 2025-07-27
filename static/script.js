@@ -1,6 +1,7 @@
 let deviceHeading = 0;
 let goalBearing = null;
 let deviceID = -1;
+let currentRobotId = deviceID; //used for image display only
 let devicesWithReadings = new Set();
 
 const measurementStatusEl = document.getElementById("measurementStatus");
@@ -438,3 +439,35 @@ function sendPosition() {
 // Start updates
 startLocationTracking();
 setInterval(updateMeasurementStatus, 5000);
+setInterval(async () => {
+  const posText = document.getElementById("currentPosition").textContent;
+  const match = posText.match(/Lat:\s*(-?\d+\.\d+), Lon:\s*(-?\d+\.\d+)/);
+  if (!match || deviceID === -1) return;
+
+  const currentLat = parseFloat(match[1]);
+  const currentLon = parseFloat(match[2]);
+  await updateAllGoalsAndCompass(currentLat, currentLon);
+}, 5000); // every 5 seconds
+
+function updateRobotPlots() {
+    const input = document.getElementById("robotIdInput").value;
+    if (input !== "") {
+      currentRobotId = input;
+    } else {
+      currentRobotId = deviceID
+    }
+
+    document.getElementById("holisticRobotId").textContent = currentRobotId;
+    document.getElementById("pathRobotId").textContent = currentRobotId;
+
+    updateImages();
+  }
+
+  function updateImages() {
+    const timestamp = new Date().getTime();
+    document.getElementById("holisticPlot").src = `/latest-holistic-plot/${currentRobotId}?cb=${timestamp}`;
+    document.getElementById("pathPlot").src = `/latest-path-plot/${currentRobotId}?cb=${timestamp}`;
+  }
+
+  setInterval(updateImages, 10000); // Auto-refresh every 10s
+  updateImages(); // Initial load
