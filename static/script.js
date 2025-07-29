@@ -1,8 +1,11 @@
 let deviceHeading = 0;
 let goalBearing = null;
 let deviceID = -1;
-let currentRobotId = deviceID; //used for image display only
+let currentRobotId = deviceID;
 let devicesWithReadings = new Set();
+let lastSensorTime = 0;
+const SENSOR_UPDATE_INTERVAL_MS = 2000;
+const goalReachThreshold = 5;
 
 const measurementStatusEl = document.getElementById("measurementStatus");
 const readingStatusBox = document.getElementById("readingStatusBox");
@@ -14,9 +17,6 @@ const CHAR_UUID_SENSOR_DATA = '98e025d3-23e5-4b62-9916-cc6c330c84ac';
 const CHAR_UUID_COMMAND = 'f78ebbff-c8b7-4107-93de-889a6a06d408';
 
 let commandCharacteristic;
-let pollingInterval = null;
-let lastDistanceToGoal = null;
-const goalReachThreshold = 5; // meters
 
 document.getElementById('enableCompassBtn').addEventListener('click', () => {
   setupDeviceOrientation();
@@ -106,188 +106,128 @@ function sendCommand(command) {
   }
 }
 
+function getCachedPosition() {
+  const posEl = document.getElementById("currentPosition");
+  const lat = parseFloat(posEl.dataset.lat);
+  const lon = parseFloat(posEl.dataset.lon);
+  if (isNaN(lat) || isNaN(lon)) return null;
+  return { lat, lon };
+}
+
 function handleSensorData(event) {
-  const value = event.target.value;
-  const data = new TextDecoder().decode(value);
-  const now = new Date();
-  const dateTimeString = now.toLocaleTimeString();
+  const now = Date.now();
+  if (now - lastSensorTime < SENSOR_UPDATE_INTERVAL_MS) return;
+  lastSensorTime = now;
 
-  getGeoData((geoError, position) => {
-    if (geoError) {
-      console.error("Geolocation error:", geoError);
-      coordinateD.innerHTML = `ERROR: ${geoError.message}`;
-      return;
-    }
-
-    const lat = position.coords.latitude;
-    const lon = position.coords.longitude;
-    coordinateD.innerHTML = `${lat},${lon}`;
-    const values = data.split(",");
-
-    document.getElementById("value1").innerText = values[0];
-    document.getElementById("value2").innerText = values[1];
-    document.getElementById("value3").innerText = (values[2] / 1000).toFixed(3);
-
-    document.getElementById("sensorDataHistory").innerHTML =
-      `${dateTimeString} - Sensor Data: ${data}<br>` +
-      document.getElementById("sensorDataHistory").innerHTML;
-
-    document.getElementById("currentPosition").textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-
-    fetch("/sendSensorValues", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        sensorValue: {
-          VWC: values[0],
-          TEMP: values[1],
-          EC: values[2],
-          Longitude: lon,
-          Latitude: lat,
-          Timestamp: dateTimeString,
-        },
-        deviceID: deviceID,
-      }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.deviceID !== undefined && data.deviceID !== -1) {
-          if (deviceID === -1) {
-            deviceID = data.deviceID;
-            mainDeviceIdEl.textContent = deviceID;
-            devicesWithReadings.add(deviceID);
-            updateAllGoalsAndCompass(lat, lon);
-          } else {
-            deviceID = data.deviceID;
-          }
-          devicesWithReadings.add(deviceID);
-          updateMeasurementStatus();
-        }
-
-        fetch("/krigingStatus")
-          .then((r) => r.json())
-          .then((kriging) => {
-            if (!kriging.running) {
-              clearInterval(pollingInterval);
-              document.getElementById("loading").style.display = "none";
-              document.querySelector(".arrow-container").style.display = "flex";
-              updateAllGoalsAndCompass(lat, lon);
-              updateMeasurementStatus();
-            }
-          });
-      })
-      .catch(console.error);
-  });
-}
-//Temp overrides for debugging
-
-function getCustomPosition() {
-  const lat = parseFloat(document.getElementById("latitudeInput").value);
-  const lon = parseFloat(document.getElementById("longitudeInput").value);
-
-  return {
-    coords: {
-      latitude: lat,
-      longitude: lon,
-      accuracy: 5,   // fixed value; adjust if you want
-      altitude: null,
-      altitudeAccuracy: null,
-      heading: null,
-      speed: null
-    },
-    timestamp: Date.now()
-  };
-}
-
-// Override getCurrentPosition
-navigator.geolocation.getCurrentPosition = function(success, error) {
-  const position = getCustomPosition();
-
-  if (!isNaN(position.coords.latitude) && !isNaN(position.coords.longitude)) {
-    success(position);
-  } else if (typeof error === "function") {
-    error({ code: 1, message: "No position set in input fields." });
-  }
-};
-
-// Override watchPosition
-navigator.geolocation.watchPosition = function(success, error) {
-  function dispatchPosition() {
-    const position = getCustomPosition();
-    if (!isNaN(position.coords.latitude) && !isNaN(position.coords.longitude)) {
-      success(position);
-    } else if (typeof error === "function") {
-      error({ code: 1, message: "No position set in input fields." });
-    }
-  }
-
-  // Hook up onchange listeners to live-update as fields change
-  document.getElementById("latitudeInput").addEventListener("input", dispatchPosition);
-  document.getElementById("longitudeInput").addEventListener("input", dispatchPosition);
-
-  // Optionally, dispatch once on call
-  dispatchPosition();
-
-  // Return a mock watch ID
-  return 1;
-};
-
-
-//end of temp overrides
-function getGeoData(callback) {
-  if (!navigator.geolocation) {
-    callback(new Error("Geolocation not supported"), null);
+  const pos = getCachedPosition();
+  if (!pos) {
+    coordinateD.innerHTML = "Location not ready.";
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
-    (position) => callback(null, position),
-    (error) => callback(error, null),
-    { enableHighAccuracy: true, timeout: 5000, maximumAge: 1000 }
-  );
-}
+  const { lat, lon } = pos;
+  coordinateD.innerHTML = `${lat},${lon}`;
 
-function startLocationTracking() {
-  if (!navigator.geolocation) return;
+  const value = event.target.value;
+  const data = new TextDecoder().decode(value);
+  const values = data.split(",");
+  const timestamp = new Date().toLocaleTimeString();
 
-  navigator.geolocation.watchPosition(
-    (position) => {
-      const lat = position.coords.latitude;
-      const lon = position.coords.longitude;
-      document.getElementById("currentPosition").innerText = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
-      if (deviceID !== -1) {
-        updateAllGoalsAndCompass(lat, lon);
+  document.getElementById("value1").innerText = values[0];
+  document.getElementById("value2").innerText = values[1];
+  document.getElementById("value3").innerText = (values[2] / 1000).toFixed(3);
+
+  document.getElementById("sensorDataHistory").innerHTML =
+    `${timestamp} - Sensor Data: ${data}<br>` +
+    document.getElementById("sensorDataHistory").innerHTML;
+
+  document.getElementById("currentPosition").textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+  document.getElementById("currentPosition").dataset.lat = lat;
+  document.getElementById("currentPosition").dataset.lon = lon;
+
+  fetch("/sendSensorValues", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      sensorValue: {
+        VWC: values[0],
+        TEMP: values[1],
+        EC: values[2],
+        Longitude: lon,
+        Latitude: lat,
+        Timestamp: timestamp,
+      },
+      deviceID: deviceID,
+    }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.deviceID !== undefined && data.deviceID !== -1) {
+        if (deviceID === -1) {
+          deviceID = data.deviceID;
+          mainDeviceIdEl.textContent = deviceID;
+          devicesWithReadings.add(deviceID);
+        } else {
+          deviceID = data.deviceID;
+        }
+        devicesWithReadings.add(deviceID);
+        updateMeasurementStatus();
       }
-    },
-    (err) => {
-      console.error("Tracking error:", err);
-    },
-    { enableHighAccuracy: true, timeout: 5000, maximumAge: 1000 }
-  );
+
+      fetch("/krigingStatus")
+        .then((r) => r.json())
+        .then((kriging) => {
+          if (!kriging.running) {
+            document.getElementById("loading").style.display = "none";
+            document.querySelector(".arrow-container").style.display = "flex";
+            updateAllGoalsAndCompass(lat, lon);
+            updateMeasurementStatus();
+          }
+        });
+    })
+    .catch(console.error);
 }
+
+navigator.geolocation.watchPosition(
+  (position) => {
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+    const posEl = document.getElementById("currentPosition");
+    posEl.textContent = `Lat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`;
+    posEl.dataset.lat = lat;
+    posEl.dataset.lon = lon;
+
+    if (deviceID !== -1) {
+      updateAllGoalsAndCompass(lat, lon);
+    }
+  },
+  (err) => {
+    console.error("Geolocation error:", err);
+  },
+  { enableHighAccuracy: true, timeout: 3000, maximumAge: 1000 }
+);
 
 async function updateAllGoalsAndCompass(currentLat, currentLon) {
-  if (deviceID === -1) return;
+  const pos = getCachedPosition();
+  if (!pos || deviceID === -1) return;
+
+  const { lat, lon } = pos;
 
   const goal = await fetchGoalForDevice(deviceID);
   if (!goal) return;
 
-  const goalLat = goal.lat;
-  const goalLon = goal.lon;
-
   document.getElementById("goalPosition").textContent =
-    `Lat: ${goalLat.toFixed(6)}, Lon: ${goalLon.toFixed(6)}`;
+    `Lat: ${goal.lat.toFixed(6)}, Lon: ${goal.lon.toFixed(6)}`;
 
-  const bearing = calculateBearing(currentLat, currentLon, goalLat, goalLon);
-  const distance = haversineDistance(currentLat, currentLon, goalLat, goalLon);
+  const bearing = calculateBearing(lat, lon, goal.lat, goal.lon);
+  const distance = haversineDistance(lat, lon, goal.lat, goal.lon);
   updateArrow(bearing);
 
   document.getElementById("distanceBox").textContent = `Distance to goal: ${distance.toFixed(1)} meters`;
 
-  lastDistanceToGoal = distance;
   updateReadingStatus(distance);
 }
 
@@ -368,106 +308,97 @@ function generateMockSensorData() {
   handleSensorData(fakeEvent);
 }
 
-// When the compass arrow is clicked, show a satellite map
 document.querySelector('.arrow-container').addEventListener('click', async () => {
   const arrowContainer = document.querySelector('.arrow-container');
-  arrowContainer.style.display = 'none'; // Hide the compass
-  document.getElementById('map').style.display = 'block'; // Show the map div
+  arrowContainer.style.display = 'none';
+  document.getElementById('map').style.display = 'block';
 
-  // Get current position again to ensure up to date
-  getGeoData(async (geoError, position) => {
-    if (geoError) {
-      console.error("Geolocation error:", geoError);
-      return;
-    }
-    const currentLat = position.coords.latitude;
-    const currentLon = position.coords.longitude;
+  const pos = getCachedPosition();
+  if (!pos) return;
+  const { lat: currentLat, lon: currentLon } = pos;
 
-    const goal = await fetchGoalForDevice(deviceID);
-    if (!goal) {
-      console.error("Goal not available");
-      return;
-    }
-    const goalLat = goal.lat;
-    const goalLon = goal.lon;
+  const goal = await fetchGoalForDevice(deviceID);
+  if (!goal) return;
 
-    // Initialize Leaflet map
-    const map = L.map('map').setView([currentLat, currentLon], 20); // zoom 20: very close range
+  const map = L.map('map').setView([currentLat, currentLon], 20);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 22,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 22,
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+  const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri'
+  }).addTo(map);
 
-    // Add satellite layer (Esri satellite)
-    const esriSat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: 'Tiles &copy; Esri'
-    }).addTo(map);
+  L.marker([currentLat, currentLon]).addTo(map).bindPopup("<b>Your Location</b>").openPopup();
+  L.marker([goal.lat, goal.lon]).addTo(map).bindPopup("<b>Goal Location</b>");
 
-    // Markers
-    const currentMarker = L.marker([currentLat, currentLon]).addTo(map);
-    currentMarker.bindPopup("<b>Your Location</b>").openPopup();
-
-    const goalMarker = L.marker([goalLat, goalLon]).addTo(map);
-    goalMarker.bindPopup("<b>Goal Location</b>");
-
-    // Fit bounds tightly around both points
-    const bounds = L.latLngBounds([
-      [currentLat, currentLon],
-      [goalLat, goalLon]
-    ]).pad(0.3);
-    map.fitBounds(bounds);
-  });
+  const bounds = L.latLngBounds([[currentLat, currentLon], [goal.lat, goal.lon]]).pad(0.3);
+  map.fitBounds(bounds);
 });
-function sendPosition() {
-    const text = document.getElementById('currentPosition').textContent;
-    const regex = /Lat:\s*(-?\d+\.?\d*), Lon:\s*(-?\d+\.?\d*)/;
-    const match = text.match(regex);
-    if (match) {
-        const lat = match[1];
-        const lon = match[2];
-        fetch('/save_grid', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({lat, lon})
-        }).then(response => response.json())
-          .then(data => alert('Grid saved: X=' + data.grid_X + ', Y=' + data.grid_Y));
-    } else {
-        alert('Could not find coordinates.');
-    }
-}
-// Start updates
-startLocationTracking();
-setInterval(updateMeasurementStatus, 5000);
-setInterval(async () => {
-  const posText = document.getElementById("currentPosition").textContent;
-  const match = posText.match(/Lat:\s*(-?\d+\.\d+), Lon:\s*(-?\d+\.\d+)/);
-  if (!match || deviceID === -1) return;
 
-  const currentLat = parseFloat(match[1]);
-  const currentLon = parseFloat(match[2]);
-  await updateAllGoalsAndCompass(currentLat, currentLon);
-}, 5000); // every 5 seconds
+function sendPosition() {
+  const pos = getCachedPosition();
+  if (!pos) {
+    alert('Coordinates not ready');
+    return;
+  }
+  fetch('/save_grid', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pos)
+  }).then(response => response.json())
+    .then(data => alert('Grid saved: X=' + data.grid_X + ', Y=' + data.grid_Y));
+}
+
 
 function updateRobotPlots() {
-    const input = document.getElementById("robotIdInput").value;
-    if (input !== "") {
-      currentRobotId = input;
-    } else {
-      currentRobotId = deviceID
-    }
+  const input = document.getElementById("robotIdInput").value;
+  currentRobotId = input !== "" ? input : deviceID;
 
-    document.getElementById("holisticRobotId").textContent = currentRobotId;
-    document.getElementById("pathRobotId").textContent = currentRobotId;
+  document.getElementById("holisticRobotId").textContent = currentRobotId;
+  document.getElementById("pathRobotId").textContent = currentRobotId;
 
-    updateImages();
+  updateImages();
+}
+
+function updateImages() {
+  const timestamp = new Date().getTime();
+  document.getElementById("holisticPlot").src = `/latest-holistic-plot/${currentRobotId}?cb=${timestamp}`;
+  document.getElementById("pathPlot").src = `/latest-path-plot/${currentRobotId}?cb=${timestamp}`;
+}
+
+async function fetchAndApplyDeviceSnapshot() {
+  try {
+    const res = await fetch('/device-snapshot');
+    if (!res.ok) throw new Error('Failed to fetch snapshot');
+    const snapshot = await res.json();
+
+    // Example snapshot structure now WITHOUT deviceID:
+    // { lat: 40.12345, lon: -74.12345, vmc: 5.4, temp: 21.1, ec: 1250 }
+
+    // Update current position display and dataset
+    document.getElementById("currentPosition").textContent = `Lat: ${snapshot.lat.toFixed(6)}, Lon: ${snapshot.lon.toFixed(6)}`;
+    document.getElementById("currentPosition").dataset.lat = snapshot.lat;
+    document.getElementById("currentPosition").dataset.lon = snapshot.lon;
+
+    // Update sensor values (VMC still mocked or from snapshot)
+    document.getElementById("value1").innerText = snapshot.vmc;
+    document.getElementById("value2").innerText = snapshot.temp;
+    document.getElementById("value3").innerText = (snapshot.ec / 1000).toFixed(3);
+
+    // Update sensor history with timestamp
+    const timestamp = new Date().toLocaleTimeString();
+    document.getElementById("sensorDataHistory").innerHTML =
+      `${timestamp} - Sensor Snapshot: VWC=${snapshot.vmc}, TEMP=${snapshot.temp}, EC=${snapshot.ec}<br>` +
+      document.getElementById("sensorDataHistory").innerHTML;
+
+    // Update UI based on position & status
+    updateMeasurementStatus();
+    updateAllGoalsAndCompass(snapshot.lat, snapshot.lon);
+
+  } catch (e) {
+    console.warn('Failed to fetch device snapshot:', e);
   }
-
-  function updateImages() {
-    const timestamp = new Date().getTime();
-    document.getElementById("holisticPlot").src = `/latest-holistic-plot/${currentRobotId}?cb=${timestamp}`;
-    document.getElementById("pathPlot").src = `/latest-path-plot/${currentRobotId}?cb=${timestamp}`;
-  }
-
-  setInterval(updateImages, 10000); // Auto-refresh every 10s
-  updateImages(); // Initial load
+}
+setInterval(fetchAndApplyDeviceSnapshot, 10000);//10s

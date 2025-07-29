@@ -68,6 +68,8 @@
   <button id="submitCommandBtn">Submit Command</button>
   <button id="getReadingBtn">Get Reading</button>
   <input id="VMCInput" placeholder="Enter VMC"/>
+  <input id="latitudeInput" placeholder="Enter LAT"/>
+  <input id="longitudeInput" placeholder="Enter LONG"/>
   <div id="sensorData">
     <div class="value-box">VWC: <span id="value1"></span></div>
     <div class="value-box">Temp: <span id="value2"></span></div>
@@ -93,6 +95,6 @@
   <div id="sensorDataHistory"></div>
   <div id="coordinateDIV" style="display: none;"></div>
 
-  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script src="{{ url_for('static', filename='scriptmock.js') }}"></script>
 </body>
 </html>

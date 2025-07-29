@@ -166,7 +166,7 @@ def save_grid():
             initial_pos = (lon, lat)
 
         # --- Step 2: Create grid around initial position ---
-        grid_X1, grid_Y1 = create_grid(initial_pos, grid_size=11, cell_size_lat=0.00012)
+        grid_X1, grid_Y1 = create_grid(initial_pos, grid_size=5, cell_size_lat=0.00013)
 
         # --- Step 3: Save to disk ---
         np.save(grid_x_file, grid_X1)
@@ -311,6 +311,66 @@ def latest_path_plot(robot_id):
         return send_from_directory(folder, latest_file)
 
     return f"No Path Plots for Robot {robot_id}", 404
+@app.route("/statusSnapshot/<int:device_id>", methods=["GET"])
+def get_status_snapshot(device_id):
+    global robots
+
+    try:
+        # Kriging & device count
+        entries = get_different_last_values(DATA_FILE_NAME)
+        device_count = len(entries)
+        kriging_running = kriging_status["running"]
+
+        # Goal for this device
+        try:
+            temp = robots[device_id].next_pos
+            goal_data = {"lon": temp[0], "lat": temp[1]}
+        except Exception as e:
+            goal_data = {"error": f"Goal not found: {str(e)}"}
+
+        # Get latest plot filenames
+        def get_latest_plot(folder, robot_id):
+            try:
+                directory = os.listdir(folder)
+                pattern = re.compile(rf"{robot_id} (\d+)\.png")
+                latest_file = None
+                max_counter = -1
+
+                for filename in directory:
+                    match = pattern.match(filename)
+                    if match:
+                        counter = int(match.group(1))
+                        if counter > max_counter:
+                            max_counter = counter
+                            latest_file = filename
+                return latest_file
+            except Exception as e:
+                return None
+        # Locate plot files
+        holistic_file = get_latest_plot("figures/Holistic Score Map", device_id)
+        path_file = get_latest_plot("figures/Path To Goal", device_id)
+
+        # Convert to public-facing endpoints
+        holistic_url = None
+        path_url = None
+        if holistic_file:
+            holistic_url = f"/static/figures/Holistic%20Score%20Map/{os.path.basename(holistic_file)}"
+        if path_file:
+            path_url = f"/static/figures/Path%20To%20Goal/{os.path.basename(path_file)}"
+
+        return jsonify({
+            "krigingRunning": kriging_running,
+            "deviceCount": device_count,
+            "goal": goal_data,
+            "plots": {
+                "holistic": holistic_url,
+                "path": path_url
+            }
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 
 @app.route("/clear", methods=["GET"])
@@ -335,9 +395,11 @@ def clear_confirmed():
         open(DATA_FILE_NAME, "w").close()
         open("goals_file.txt", "w").close()
         open("app.log", "w").close()
-        for folder_path in os.listdir("figures"):
-            for filename in os.listdir("figures/"+folder_path):
-                file_path = os.path.join("figures/"+folder_path, filename)
+        open("grid_X.npy", "w").close()
+        open("grid_Y.npy", "w").close()
+        for folder_path in os.listdir("static/figures"):
+            for filename in os.listdir("static/figures/"+folder_path):
+                file_path = os.path.join("static/figures/"+folder_path, filename)
                 try:
                     os.remove(file_path)
                     print(f"Deleted: {filename}")
@@ -353,6 +415,9 @@ def clear_confirmed():
 def webble_api():
     return render_template("webble.html")
 
+@app.route("/webblemock", methods=["GET"])
+def webbleMock_api():
+    return render_template("webblewMock.html")
 
 def run_ngrok():
     command = "ngrok http --url=awaited-definite-cockatoo.ngrok-free.app 8080"

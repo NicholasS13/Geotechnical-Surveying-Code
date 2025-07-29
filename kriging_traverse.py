@@ -107,32 +107,30 @@ class Robot:
         )
 
         if visualize:
-            fig = plt.figure(figsize=(6, 5))
-            plt.imshow(
+            dx = grid_X[0, 1] - grid_X[0, 0]
+            dy = grid_Y[1, 0] - grid_Y[0, 0]
+            fig, ax = plt.subplots(figsize=(6, 5))
+            ax.imshow(
                 score_map,
-                origin="lower",
-                cmap="plasma",
-                extent=[grid_X[0, 0], grid_X[0, -1], grid_Y[0, 0], grid_Y[-1, 0]],
+                origin='lower',
+                cmap='plasma',
+                interpolation='none',
+                extent=[
+                    grid_X[0, 0] - dx/2, grid_X[0, -1] + dx/2,
+                    grid_Y[0, 0] - dy/2, grid_Y[-1, 0] + dy/2
+                ]
             )
-            plt.title(f"Robot {self.id} - Holistic Score Map")
-            plt.colorbar(label="Score")
-            plt.scatter(
-                self.pos[0], self.pos[1], c="red", marker="x", label="Current Pos"
-            )
+            ax.set_title(f"Robot {self.id} - Holistic Score Map")
+            ax.set_xlabel("Longitude")
+            ax.set_ylabel("Latitude")
+            ax.scatter(self.pos[0], self.pos[1], c='red', marker='x', label='Current Pos')
             if self.goal:
-                plt.scatter(
-                    self.goal[0],
-                    self.goal[1],
-                    c="green",
-                    marker="o",
-                    label="Current Goal",
-                )
-            plt.xlabel("Longitude")
-            plt.ylabel("Latitude")
-            plt.legend()
+                ax.scatter(self.goal[0], self.goal[1], c='green', marker='o', label='Current Goal')
+            ax.legend()
             plt.tight_layout()
-            # plt.show()
-            filename = f"figures/Holistic Score Map/{self.id} {holistic_score_map_image_counter}.png"
+            #plt.show()
+ 
+            filename = f"static/figures/Holistic Score Map/{self.id} {holistic_score_map_image_counter}.png"
             fig.savefig(filename)
 
             plt.close(fig)  # prevent memory leaks
@@ -198,7 +196,7 @@ class Robot:
             plt.legend()
             plt.tight_layout()
             # plt.show()
-            filename = f"figures/Closeness To Robot/{self.id} {closeness_to_robot_image_counter}.png"
+            filename = f"static/figures/Closeness To Robot/{self.id} {closeness_to_robot_image_counter}.png"
             fig.savefig(filename)
 
             plt.close(fig)  # prevent memory leaks
@@ -306,7 +304,7 @@ def create_grid(center_pos, grid_size, cell_size_lat, visualize=False):
         plt.grid(False)
         # plt.show()
 
-        filename = f"figures/Grid around Center Position/{grid_image_counter}.png"
+        filename = f"static/figures/Grid around Center Position/{grid_image_counter}.png"
         plt.savefig(filename)
 
         plt.close(fig)  # prevent memory leaks
@@ -429,7 +427,7 @@ def assign_goal_and_path_for_robot(
         ax.legend()
         plt.tight_layout()
         # plt.show()
-        filename = f"figures/Path To Goal/{robot.id} {path_to_goal_image_counter}.png"
+        filename = f"static/figures/Path To Goal/{robot.id} {path_to_goal_image_counter}.png"
         plt.savefig(filename)
 
         plt.close(fig)  # prevent memory leaks
