@@ -60,7 +60,23 @@ document.getElementById('submitCommandBtn').addEventListener('click', () => {
   sendCommand(document.getElementById("commandInput").value);
 });
 
-document.getElementById('getReadingBtn').addEventListener('click', generateMockSensorData);
+document.getElementById('getReadingBtn').addEventListener('click', async () => {
+  try {
+    if (!commandCharacteristic) {
+      console.error("BLE command characteristic not available. Connect first.");
+      return;
+    }
+    const command = "get reading";
+    const commandData = new TextEncoder().encode(command);
+    await commandCharacteristic.writeValue(commandData);
+    console.log("Sent command to BLE device:", command);
+    alert("Command sent to ESP32")
+  } catch (err) {
+    console.error("Failed to send get reading command:", err);
+    alert("command not sent")
+  }
+});
+
 
 function setupDeviceOrientation() {
   if (
