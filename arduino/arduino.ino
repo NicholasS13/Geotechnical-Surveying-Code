@@ -5,7 +5,6 @@
 #include <BLE2902.h>
 
 #define DATA_PIN 10
-#define SENSOR_ADDR '3'
 #define BAUD_RATE 115200
 
 
@@ -14,11 +13,13 @@
 #define CHARACTERISTIC_UUID_SENSOR_DATA "98e025d3-23e5-4b62-9916-cc6c330c84ac"
 #define CHARACTERISTIC_UUID_COMMAND     "f78ebbff-c8b7-4107-93de-889a6a06d408"
 
+char SENSOR_ADDR = '3';
 
 SDI12 sdi12(DATA_PIN);
 
 BLECharacteristic *sensorDataCharacteristic;
 BLECharacteristic *commandCharacteristic;
+BLEAdvertising *advertising; // Make it global so we can restart it
 
 float convertVWC(float raw) {
   return (3.879e-4 * raw) - 0.6956;
@@ -86,13 +87,27 @@ void getReading() {
   }
   sdi12.clearBuffer();
 }
-
+//for handling device reconnection
+class MyServerCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) override {
+    Serial.println("Client connected.");
+  }
+  void onDisconnect(BLEServer* pServer) override {
+    Serial.println("Client disconnected — restarting advertising...");
+    advertising->start();  // Restart advertising after disconnect
+  }
+};
 // Callback for command input (VMC)
 class CommandCallback : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *characteristic) override {
     String value = characteristic->getValue();
-    if (!value.isEmpty()) {
+    if(value.equals("get reading")) {
+      Serial.print("Getting Reading");
       getReading();
+    }else if(value.indexOf("SENSOR_ADDR")!=0){
+      //SENSOR_ADDR = value.substring(value.indexOf("=")+1);
+      SENSOR_ADDR = value[value.length() - 1];
+
     }
   }
 };
@@ -105,6 +120,8 @@ void setup() {
   Serial.println("Starting Teros 12 SDI-12 sensor read...");
   BLEDevice::init("ESP32S3 Feather");
   BLEServer *server = BLEDevice::createServer();
+  server->setCallbacks(new MyServerCallbacks());
+
   BLEService *service = server->createService(SERVICE_UUID);
 
   // Sensor Data Characteristic (Notify)
@@ -122,8 +139,10 @@ void setup() {
   commandCharacteristic->setCallbacks(new CommandCallback());
 
   service->start();
-  BLEAdvertising *advertising = BLEDevice::getAdvertising();
+  
+  advertising = BLEDevice::getAdvertising();
   advertising->addServiceUUID(SERVICE_UUID);
   advertising->start();
+  Serial.println("Advertising Started.");
 }
 void loop(){}
