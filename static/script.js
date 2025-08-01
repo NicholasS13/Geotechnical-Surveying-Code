@@ -4,6 +4,7 @@ let deviceID = -1;
 let currentRobotId = deviceID;
 let devicesWithReadings = new Set();
 let lastSensorTime = 0;
+let holisticPlotURL = ""
 const SENSOR_UPDATE_INTERVAL_MS = 2000;
 const goalReachThreshold = 5;
 
@@ -353,19 +354,7 @@ document.querySelector('.arrow-container').addEventListener('click', async () =>
   map.fitBounds(bounds);
 });
 
-function sendPosition() {
-  const pos = getCachedPosition();
-  if (!pos) {
-    alert('Coordinates not ready');
-    return;
-  }
-  fetch('/save_grid', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(pos)
-  }).then(response => response.json())
-    .then(data => alert('Grid saved: X=' + data.grid_X + ', Y=' + data.grid_Y));
-}
+
 
 
 function updateRobotPlots() {
@@ -393,25 +382,10 @@ async function fetchAndApplyDeviceSnapshot() {
     // Example snapshot structure now WITHOUT deviceID:
     // { lat: 40.12345, lon: -74.12345, vmc: 5.4, temp: 21.1, ec: 1250 }
 
-    // Update current position display and dataset
-    document.getElementById("currentPosition").textContent = `Lat: ${snapshot.lat.toFixed(6)}, Lon: ${snapshot.lon.toFixed(6)}`;
-    document.getElementById("currentPosition").dataset.lat = snapshot.lat;
-    document.getElementById("currentPosition").dataset.lon = snapshot.lon;
-
-    // Update sensor values (VMC still mocked or from snapshot)
-    document.getElementById("value1").innerText = snapshot.vmc;
-    document.getElementById("value2").innerText = snapshot.temp;
-    document.getElementById("value3").innerText = (snapshot.ec / 1000).toFixed(3);
-
+    //update plot endpoints
+    document.getElementById("holisticPlot").src = snapshot.plots.holostic;
+    document.getElementById("pathPlot").src = snapshot.plots.path;
     // Update sensor history with timestamp
-    const timestamp = new Date().toLocaleTimeString();
-    document.getElementById("sensorDataHistory").innerHTML =
-      `${timestamp} - Sensor Snapshot: VWC=${snapshot.vmc}, TEMP=${snapshot.temp}, EC=${snapshot.ec}<br>` +
-      document.getElementById("sensorDataHistory").innerHTML;
-
-    // Update UI based on position & status
-    updateMeasurementStatus();
-    updateAllGoalsAndCompass(snapshot.lat, snapshot.lon);
 
   } catch (e) {
     console.warn('Failed to fetch device snapshot:', e);
