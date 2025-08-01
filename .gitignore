@@ -1,0 +1,7 @@
+app.log
+grid_X.npy
+grid_Y.npy
+ngrok.exe
+sensor.txt
+goals_file.txt
+__pycache__/
