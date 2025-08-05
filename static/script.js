@@ -46,16 +46,18 @@ document.getElementById('connect').addEventListener('click', async () => {
   }
 });
 
+
+
 document.getElementById('viewDataHistory').addEventListener('click', () => {
   const sensorDataHistory = document.getElementById('sensorDataHistory');
   sensorDataHistory.style.display =
     sensorDataHistory.style.display === 'none' ? 'block' : 'none';
 });
-
+/*
 document.getElementById("cannotgo").addEventListener("click", () => {
   const newDirection = confirm("Is it shorter to go right?") ? 90 : 270;
   updateArrow(newDirection);
-});
+});*/
 
 document.getElementById('submitCommandBtn').addEventListener('click', () => {
   sendCommand(document.getElementById("commandInput").value);
@@ -385,6 +387,8 @@ async function fetchAndApplyDeviceSnapshot() {
     //update plot endpoints
     document.getElementById("holisticPlot").src = snapshot.plots.holostic;
     document.getElementById("pathPlot").src = snapshot.plots.path;
+    document.getElementById("zhatPlot").src = snapshot.plots.zhat;
+    document.getElementById("zvarPlot").src = snapshot.plots.zvar;
     // Update sensor history with timestamp
 
   } catch (e) {

@@ -61,7 +61,7 @@
     <div id="goalDevice2" class="goal-item">Device 2: Lat: —, Lon: —</div>
   </div>
 
-  <button id="cannotgo">Can Not Go forward</button>
+  <!-- <button id="cannotgo">Can Not Go forward</button> -->
   <button id="connect">Connect to ESP32</button> 
   <input id="commandInput" placeholder="Enter command"/>
   <button id="submitCommandBtn">Submit Command</button>
@@ -78,14 +78,21 @@
   </div>
 
   <!-- Holistic Score Plot -->
-  <h3>Latest Holistic Score Map for Robot <span id="holisticRobotId">2</span></h3>
+  <h3>Latest Holistic Score Map for Robot <span id="holisticRobotId">#</span></h3>
   <img id="holisticPlot" alt="No Holostic Score Map Plots Yet"style="width: 600px; border: 1px solid #ccc;" />
 
   <!-- Path to Goal Plot -->
-  <h3>Latest Path to Goal Map for Robot <span id="pathRobotId">2</span></h3>
+  <h3>Latest Path to Goal Map for Robot <span id="pathRobotId">#</span></h3>
   <img id="pathPlot" alt="No Robot Path Images Yet" style="width: 600px; border: 1px solid #ccc;" />
 
-  
+    <!-- Zhat Plot -->
+  <h3>Latest Zhat Map</h3>
+  <img id="zhatPlot" alt="No Zhat Plots Yet"style="width: 600px; border: 1px solid #ccc;" />
+
+  <!-- Zvar Plot -->
+  <h3>Latest Zvar Map</h3>
+  <img id="zvarPlot" alt="No Zvar Plots Yet" style="width: 600px; border: 1px solid #ccc;" />
+
   <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
   <div id="sensorDataHistory"></div>
   <div id="coordinateDIV" style="display: none;"></div>

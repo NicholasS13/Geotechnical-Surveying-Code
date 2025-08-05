@@ -9,11 +9,11 @@
 
 
 // UUIDs must match frontend
-#define SERVICE_UUID           "91bad492-b950-4226-aa2b-4ede9fa42f59"
+#define SERVICE_UUID "91bad492-b950-4226-aa2b-4ede9fa42f59"
 #define CHARACTERISTIC_UUID_SENSOR_DATA "98e025d3-23e5-4b62-9916-cc6c330c84ac"
-#define CHARACTERISTIC_UUID_COMMAND     "f78ebbff-c8b7-4107-93de-889a6a06d408"
+#define CHARACTERISTIC_UUID_COMMAND "f78ebbff-c8b7-4107-93de-889a6a06d408"
 
-char SENSOR_ADDR = '3';
+char SENSOR_ADDR = '5';
 
 SDI12 sdi12(DATA_PIN);
 
@@ -114,7 +114,7 @@ class CommandCallback : public BLECharacteristicCallbacks {
 
 void setup() {
   Serial.begin(BAUD_RATE);
-  while (!Serial);
+ // while (!Serial);
   sdi12.begin();
   delay(2000);
   Serial.println("Starting Teros 12 SDI-12 sensor read...");

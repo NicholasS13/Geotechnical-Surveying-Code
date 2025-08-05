@@ -166,7 +166,7 @@ def save_grid():
             initial_pos = (lon, lat)
 
         # --- Step 2: Create grid around initial position ---
-        grid_X1, grid_Y1 = create_grid(initial_pos, grid_size=5, cell_size_lat=0.00013)
+        grid_X1, grid_Y1 = create_grid(initial_pos, grid_size=7, cell_size_lat=0.0001)
 
         # --- Step 3: Save to disk ---
         np.save(grid_x_file, grid_X1)
@@ -314,6 +314,7 @@ def latest_path_plot(robot_id):
 @app.route("/statusSnapshot/<int:device_id>", methods=["GET"])
 def get_status_snapshot(device_id):
     global robots
+    global DATA_FILE_NAME
 
     try:
         # Kriging & device count
@@ -329,6 +330,23 @@ def get_status_snapshot(device_id):
             goal_data = {"error": f"Goal not found: {str(e)}"}
 
         # Get latest plot filenames
+        def get_latest_plot_without_id(folder):
+            try:
+                directory = os.listdir(folder)
+                pattern = re.compile(rf"(\d+)\.png")
+                latest_file = None
+                max_counter = -1
+
+                for filename in directory:
+                    match = pattern.match(filename)
+                    if match:
+                        counter = int(match.group(1))
+                        if counter > max_counter:
+                            max_counter = counter
+                            latest_file = filename
+                return latest_file
+            except Exception as e:
+                return None
         def get_latest_plot(folder, robot_id):
             try:
                 directory = os.listdir(folder)
@@ -350,13 +368,21 @@ def get_status_snapshot(device_id):
         holistic_file = get_latest_plot("figures/Holistic Score Map", device_id)
         path_file = get_latest_plot("figures/Path To Goal", device_id)
 
+        zhat_file = get_latest_plot_without_id("figures/Zhat")
+        zvar_file = get_latest_plot_without_id("figures/Zvar")
         # Convert to public-facing endpoints
         holistic_url = None
         path_url = None
+        zhat_url = None
+        zvar_url = None
         if holistic_file:
             holistic_url = f"/static/figures/Holistic%20Score%20Map/{os.path.basename(holistic_file)}"
         if path_file:
             path_url = f"/static/figures/Path%20To%20Goal/{os.path.basename(path_file)}"
+        if zhat_file:
+            zhat_url = f"/static/figures/Zhat/{os.path.basename(zhat_file)}"
+        if zvar_file:
+            zvar_url = f"/static/figures/Zvar/{os.path.basename(zvar_file)}"
 
         return jsonify({
             "krigingRunning": kriging_running,
@@ -364,7 +390,9 @@ def get_status_snapshot(device_id):
             "goal": goal_data,
             "plots": {
                 "holistic": holistic_url,
-                "path": path_url
+                "path": path_url,
+                "zhat":zhat_url,
+                "zvar": zvar_url
             }
         })
 
@@ -406,7 +434,7 @@ def clear_confirmed():
                 except OSError as e:
                     print(f"Error deleting {filename}: {e}")
         device_count = 0
-        return jsonify({"msg": "System ready for restart"})
+        return jsonify({"msg": "System ready for New Test"})
     except Exception as e:
         return jsonify({"msg": f"Error clearing files: {e}"}), 500
 
@@ -417,7 +445,7 @@ def webble_api():
 
 @app.route("/webblemock", methods=["GET"])
 def webbleMock_api():
-    return render_template("webblewMock.html")
+    return render_template("webbleMock.html")
 
 def run_ngrok():
     command = "ngrok http --url=awaited-definite-cockatoo.ngrok-free.app 8080"

@@ -18,6 +18,7 @@ holistic_score_map_image_counter = 0
 closeness_to_robot_image_counter = 0
 grid_image_counter = 0
 path_to_goal_image_counter = 0
+perform_kriging_counter = 0
 
 
 # --- Robot Class ---
@@ -332,23 +333,44 @@ def get_nearest_cell(grid_X, grid_Y, pos):
 
 
 def perform_kriging(known_positions, known_vmc, grid_X, grid_Y):
-    """_summary_
+    global perform_kriging_counter
 
-    Args:
-        known_positions (_type_): _description_
-        known_vmc (_type_): _description_
-        grid_X (_type_): _description_
-        grid_Y (_type_): _description_
-
-    Returns:
-        _type_: _description_
-    """
     x = np.array([p[0] for p in known_positions])
     y = np.array([p[1] for p in known_positions])
     v = np.array(known_vmc)
+    OK = OrdinaryKriging(x, y, v, variogram_model='exponential', exact_values=True)
+    Zhat, Zvar = OK.execute('grid', grid_X[0, :], grid_Y[:, 0])
+    # --- Visualization of Zhat (Expected Value) ---
+    fig = plt.figure(figsize=(6, 5))
+    plt.imshow(Zhat, origin='lower', cmap='viridis',
+               extent=[grid_X[0, 0], grid_X[0, -1], grid_Y[0, 0], grid_Y[-1, 0]])
+    plt.title("Kriging - Expected Value (Zhat)")
+    plt.colorbar(label="VMC")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    #plt.show()
 
-    OK = OrdinaryKriging(x, y, v, variogram_model="exponential", exact_values=True)
-    Zhat, Zvar = OK.execute("grid", grid_X[0, :], grid_Y[:, 0])
+    filename = f"static/figures/Zhat/{perform_kriging_counter}.png"
+    plt.savefig(filename)
+    plt.close(fig)
+    # --- Visualization of Zvar (Variance) ---
+    fig2 = plt.figure(figsize=(6, 5))
+    plt.imshow(Zvar, origin='lower', cmap='magma',
+               extent=[grid_X[0, 0], grid_X[0, -1], grid_Y[0, 0], grid_Y[-1, 0]])
+    plt.title("Kriging - Variance (Zvar)")
+    plt.colorbar(label="Uncertainty")
+    plt.xlabel("Longitude")
+    plt.ylabel("Latitude")
+    plt.tight_layout()
+    #plt.show()
+    
+    filename = f"static/figures/Zvar/{perform_kriging_counter}.png"
+    plt.savefig(filename)
+
+    perform_kriging_counter = perform_kriging_counter+1;
+
+    plt.close(fig2)
     return Zhat, Zvar
 
 
