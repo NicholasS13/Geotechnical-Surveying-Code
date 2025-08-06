@@ -62,7 +62,7 @@ class Robot:
         shared_score_map,
         grid_X,
         grid_Y,
-        w_current_pos: float = 0.10,
+        w_current_pos: float = 10,
         w_goal: float = 10.0,
         visualize: bool = True,
     ):
@@ -340,6 +340,13 @@ def perform_kriging(known_positions, known_vmc, grid_X, grid_Y):
     v = np.array(known_vmc)
     OK = OrdinaryKriging(x, y, v, variogram_model='exponential', exact_values=True)
     Zhat, Zvar = OK.execute('grid', grid_X[0, :], grid_Y[:, 0])
+    logger.info("Zhat:"+str(Zhat))
+    logger.info("Zvar:"+str(Zvar))
+    with open("files/zhat_zvar.txt", "w") as f:
+        f.write("Zhat:\n")
+        np.savetxt(f, Zhat, fmt="%.6f")
+        f.write("\nZvar:\n")
+        np.savetxt(f, Zvar, fmt="%.6f")
     # --- Visualization of Zhat (Expected Value) ---
     fig = plt.figure(figsize=(6, 5))
     plt.imshow(Zhat, origin='lower', cmap='viridis',

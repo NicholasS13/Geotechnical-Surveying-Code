@@ -9,17 +9,48 @@ import logging
 import threading
 import re
 
+# Create logger
 logger = logging.getLogger(__name__)
-logging.basicConfig(
-    filename="app.log",
-    encoding="utf-8",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.DEBUG,
+logger.setLevel(logging.DEBUG)  # capture all levels
+
+# Formatter (same for all files)
+formatter = logging.Formatter(
+    '%(asctime)s | %(levelname)s | %(name)s | %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
-logger.debug("This message should go to the log file")
-logger.info("So should this")
-logger.warning("And this, too")
-logger.error("And non-ASCII stuff, too, like Øresund and Malmö")
+
+# Custom filter to allow only specific level
+class LevelFilter(logging.Filter):
+    def __init__(self, level):
+        super().__init__()
+        self.level = level
+    def filter(self, record):
+        return record.levelno == self.level
+
+# Dictionary of level → filename
+log_files = {
+    logging.DEBUG:   "files/logs/debug.log",
+    logging.INFO:    "files/logs/info.log",
+    logging.WARNING: "files/logs/warning.log",
+    logging.ERROR:   "files/logs/error.log",
+    logging.CRITICAL:"files/logs/critical.log",
+}
+
+# Create a handler per log level
+for level, filepath in log_files.items():
+    handler = logging.FileHandler(filepath, mode="a")
+    handler.setLevel(level)
+    handler.addFilter(LevelFilter(level))
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+'''
+logger.debug("This message should go to the debug.log file")
+logger.info("This message should go to the info.log file")
+logger.warning("This message should go to the warning.log file")
+logger.error("This message should go to the error.log file")
+'''
+
 app = Flask(__name__)
 CORS(app)
 cell_size = 0.0001
@@ -28,10 +59,10 @@ Zhat = None
 robots: list = list()
 
 device_count = 0
-DATA_FILE_NAME = "sensor.txt"
+DATA_FILE_NAME = "files/sensor.txt"
 
-grid_x_file = "grid_X.npy"
-grid_y_file = "grid_Y.npy"
+grid_x_file = "files/grid_X.npy"
+grid_y_file = "files/grid_Y.npy"
 # Global status dictionary (could also be stored in a file or DB)
 kriging_status = {"running": False}
 grid_X, grid_Y = None, None
@@ -97,8 +128,8 @@ def run_kriging_with_status():
 
                         # Visited cell
                         visited_cells.add(get_nearest_cell(grid_X, grid_Y, (lon, lat)))
-                    except:
-                        continue
+                    except Exception as e:
+                        logger.critical("Line 129:"+str(e))
 
             # --- Step 7: Kriging and scoring ---
             Zhat, Zvar = perform_kriging(all_positions, all_vmc, grid_X, grid_Y)
@@ -108,7 +139,7 @@ def run_kriging_with_status():
             )
 
             # --- Step 8: Load previous goals ---
-            goals_file = "goals_file.txt"
+            goals_file = "files/goals_file.txt"
             if not os.path.exists(goals_file):
                 goal_dict = {}
             else:
@@ -179,6 +210,14 @@ def save_grid():
         )  # Logs error to your Flask console
         return False
 
+#to remove annoying 404 msgs
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(
+        os.path.join(app.root_path, 'static/icons'),
+        'favicon.ico',
+        mimetype='image/png'
+    )
 
 @app.route("/sendSensorValues", methods=["POST"])
 def send_sensor_values():
@@ -405,13 +444,26 @@ def clear_confirmation():
 @app.route("/clear/confirm", methods=["POST"])
 def clear_confirmed():
     global device_count
+    global logger
     
     try:
         open(DATA_FILE_NAME, "w").close()
-        open("goals_file.txt", "w").close()
-        open("app.log", "w").close()
-        open("grid_X.npy", "w").close()
-        open("grid_Y.npy", "w").close()
+        open("files/goals_file.txt", "w").close()
+        #open("files/app.log", "w").close()
+        open("files/grid_X.npy", "w").close()
+        open("files/grid_Y.npy", "w").close()
+        open("files/zhat_zvar.txt", "w").close()
+
+        for filename in os.listdir("files/logs"):
+            file_path = os.path.join("files/logs", filename)
+            try:
+                open(file_path,'w').close()
+
+                print(f"Cleared: {filename}")
+            except OSError as e:
+                print(f"Error clearing {filename}: {e}")
+                logger.critical(f"Error clearing {filename}: {e}")
+
         for folder_path in os.listdir("static/figures"):
             for filename in os.listdir("static/figures/"+folder_path):
                 file_path = os.path.join("static/figures/"+folder_path, filename)
