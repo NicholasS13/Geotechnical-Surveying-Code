@@ -311,31 +311,31 @@ def latest_path_plot(robot_id):
         return send_from_directory(folder, latest_file)
 
     return f"No Path Plots for Robot {robot_id}", 404
+
 @app.route("/statusSnapshot/<int:device_id>", methods=["GET"])
 def get_status_snapshot(device_id):
     global robots
     global DATA_FILE_NAME
 
     try:
-        # Kriging & device count
+        # --- Kriging & device count ---
         entries = get_different_last_values(DATA_FILE_NAME)
         device_count = len(entries)
         kriging_running = kriging_status["running"]
 
-        # Goal for this device
+        # --- Goal for this device ---
         try:
             temp = robots[device_id].next_pos
             goal_data = {"lon": temp[0], "lat": temp[1]}
         except Exception as e:
             goal_data = {"error": f"Goal not found: {str(e)}"}
 
-        # Get latest plot filenames
-        def get_latest_plot_without_id(folder):
+        # --- File lookup helpers ---
+        def get_latest_plot(folder, pattern):
             try:
-                directory = os.listdir(folder)
-                pattern = re.compile(rf"(\d+)\.png")
-                latest_file = None
-                max_counter = -1
+                fs_path = os.path.join("static", folder)
+                directory = os.listdir(fs_path)
+                latest_file, max_counter = None, -1
 
                 for filename in directory:
                     match = pattern.match(filename)
@@ -344,46 +344,33 @@ def get_status_snapshot(device_id):
                         if counter > max_counter:
                             max_counter = counter
                             latest_file = filename
-                return latest_file
-            except Exception as e:
+
+                if latest_file:
+                    return f"/static/{folder}/{latest_file}"  # public URL
                 return None
-        def get_latest_plot(folder, robot_id):
-            try:
-                directory = os.listdir(folder)
-                pattern = re.compile(rf"{robot_id} (\d+)\.png")
-                latest_file = None
-                max_counter = -1
-
-                for filename in directory:
-                    match = pattern.match(filename)
-                    if match:
-                        counter = int(match.group(1))
-                        if counter > max_counter:
-                            max_counter = counter
-                            latest_file = filename
-                return latest_file
             except Exception as e:
+                print(f"Plot lookup error in {folder}: {e}")
                 return None
-        # Locate plot files
-        holistic_file = get_latest_plot("figures/Holistic Score Map", device_id)
-        path_file = get_latest_plot("figures/Path To Goal", device_id)
 
-        zhat_file = get_latest_plot_without_id("figures/Zhat")
-        zvar_file = get_latest_plot_without_id("figures/Zvar")
-        # Convert to public-facing endpoints
-        holistic_url = None
-        path_url = None
-        zhat_url = None
-        zvar_url = None
-        if holistic_file:
-            holistic_url = f"/static/figures/Holistic%20Score%20Map/{os.path.basename(holistic_file)}"
-        if path_file:
-            path_url = f"/static/figures/Path%20To%20Goal/{os.path.basename(path_file)}"
-        if zhat_file:
-            zhat_url = f"/static/figures/Zhat/{os.path.basename(zhat_file)}"
-        if zvar_file:
-            zvar_url = f"/static/figures/Zvar/{os.path.basename(zvar_file)}"
+        # --- Find the latest files ---
+        holistic_url = get_latest_plot(
+            "figures/Holistic Score Map",
+            re.compile(rf"{device_id} (\d+)\.png")
+        )
+        path_url = get_latest_plot(
+            "figures/Path To Goal",
+            re.compile(rf"{device_id} (\d+)\.png")
+        )
+        zhat_url = get_latest_plot(
+            "figures/Zhat",
+            re.compile(r"(\d+)\.png")
+        )
+        zvar_url = get_latest_plot(
+            "figures/Zvar",
+            re.compile(r"(\d+)\.png")
+        )
 
+        # --- Build response ---
         return jsonify({
             "krigingRunning": kriging_running,
             "deviceCount": device_count,
@@ -391,7 +378,7 @@ def get_status_snapshot(device_id):
             "plots": {
                 "holistic": holistic_url,
                 "path": path_url,
-                "zhat":zhat_url,
+                "zhat": zhat_url,
                 "zvar": zvar_url
             }
         })

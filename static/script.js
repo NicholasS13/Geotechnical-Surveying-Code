@@ -377,19 +377,28 @@ function updateImages() {
 
 async function fetchAndApplyDeviceSnapshot() {
   try {
-    const res = await fetch('/device-snapshot');
+    const res = await fetch(`/statusSnapshot/${deviceID}`);
     if (!res.ok) throw new Error('Failed to fetch snapshot');
     const snapshot = await res.json();
+    const timestamp = new Date().getTime(); // cache-buster
 
-    // Example snapshot structure now WITHOUT deviceID:
-    // { lat: 40.12345, lon: -74.12345, vmc: 5.4, temp: 21.1, ec: 1250 }
-
-    //update plot endpoints
-    document.getElementById("holisticPlot").src = snapshot.plots.holostic;
-    document.getElementById("pathPlot").src = snapshot.plots.path;
-    document.getElementById("zhatPlot").src = snapshot.plots.zhat;
-    document.getElementById("zvarPlot").src = snapshot.plots.zvar;
-    // Update sensor history with timestamp
+    // Update plot endpoints if they exist
+    if (snapshot.plots.holistic) {
+      document.getElementById("holisticPlot").src =
+        snapshot.plots.holistic + `?cb=${timestamp}`;
+    }
+    if (snapshot.plots.path) {
+      document.getElementById("pathPlot").src =
+        snapshot.plots.path + `?cb=${timestamp}`;
+    }
+    if (snapshot.plots.zhat) {
+      document.getElementById("zhatPlot").src =
+        snapshot.plots.zhat + `?cb=${timestamp}`;
+    }
+    if (snapshot.plots.zvar) {
+      document.getElementById("zvarPlot").src =
+        snapshot.plots.zvar + `?cb=${timestamp}`;
+    }
 
   } catch (e) {
     console.warn('Failed to fetch device snapshot:', e);

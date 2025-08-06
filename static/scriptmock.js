@@ -463,10 +463,30 @@ function updateRobotPlots() {
     updateImages();
   }
 
-  function updateImages() {
-    const timestamp = new Date().getTime();
-    document.getElementById("holisticPlot").src = `/latest-holistic-plot/${currentRobotId}?cb=${timestamp}`;
-    document.getElementById("pathPlot").src = `/latest-path-plot/${currentRobotId}?cb=${timestamp}`;
+  async function updateImages() {
+    try {
+      const timestamp = new Date().getTime();
+
+      // Fetch snapshot from the backend
+      const res = await fetch(`/statusSnapshot/${deviceID}`);
+      if (!res.ok) throw new Error("Failed to fetch snapshot");
+
+      const snapshot = await res.json();
+
+      // Update images if URLs are available
+      if (snapshot.plots.holistic) {
+        document.getElementById("holisticPlot").src =
+          snapshot.plots.holistic + `?cb=${timestamp}`;
+      }
+
+      if (snapshot.plots.path) {
+        document.getElementById("pathPlot").src =
+          snapshot.plots.path + `?cb=${timestamp}`;
+      }
+
+    } catch (err) {
+      console.error("Error updating images:", err);
+    }
   }
 
   setInterval(updateImages, 10000); // Auto-refresh every 10s

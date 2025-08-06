@@ -62,7 +62,7 @@ class Robot:
         shared_score_map,
         grid_X,
         grid_Y,
-        w_current_pos: float = 10,
+        w_current_pos: float = 0.10,
         w_goal: float = 10.0,
         visualize: bool = True,
     ):
