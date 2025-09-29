@@ -14,7 +14,7 @@
   <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='icons/favicon-16x16.png') }}">
   <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/android-chrome-192x192.png') }}">
   <link rel="icon" type="image/png" sizes="512x512" href="{{ url_for('static', filename='icons/android-chrome-512x512.png') }}">
-  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='icons/site.webmanifest') }}">
 
 </head>
 <body>
@@ -32,7 +32,6 @@
 
   <div id="loading">Loading Kriging Traverse...</div>
 
-  <button id="enableCompassBtn">Enable Compass</button>
 
   <div class="arrow-container" title="Arrow points towards goal">
     <svg id="arrow" class="arrow-svg" viewBox="0 0 100 100" width="100" height="100">
@@ -62,19 +61,15 @@
   </div>
 
   <!-- <button id="cannotgo">Can Not Go forward</button> -->
+  <button id="enableCompassBtn">Enable Compass</button>
   <button id="connect">Connect to ESP32</button> 
-  <input id="commandInput" placeholder="Enter command"/>
-  <button id="submitCommandBtn">Submit Command</button>
+
   <button id="getReadingBtn">Get Reading</button>
-  <input id="VMCInput" placeholder="Enter VMC"/>
+  <input id="VMCInput" placeholder="Enter VMC" style="display:none"/>
   <div id="sensorData">
     <div class="value-box">VWC: <span id="value1"></span></div>
     <div class="value-box">Temp: <span id="value2"></span></div>
     <div class="value-box">EC: <span id="value3"></span></div>
-  </div>
-
-  <div>
-    <label for="robotIdInput">View Plots</label>
   </div>
 
   <!-- Holistic Score Plot -->
@@ -95,6 +90,9 @@
 
   <h3 id="viewDataHistory" style="cursor: pointer;">View Data History</h3>
   <div id="sensorDataHistory"></div>
+
+  <input id="commandInput" placeholder="Enter command"/>
+  <button id="submitCommandBtn">Submit Command</button>
   <div id="coordinateDIV" style="display: none;"></div>
 
   <script src="{{ url_for('static', filename='script.js') }}"></script>

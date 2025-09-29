@@ -9,6 +9,7 @@ import logging
 import threading
 import re
 
+
 # Create logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)  # capture all levels
@@ -52,6 +53,7 @@ logger.error("This message should go to the error.log file")
 '''
 
 app = Flask(__name__)
+
 CORS(app)
 cell_size = 0.0001
 
@@ -66,6 +68,8 @@ grid_y_file = "files/grid_Y.npy"
 # Global status dictionary (could also be stored in a file or DB)
 kriging_status = {"running": False}
 grid_X, grid_Y = None, None
+
+shared_score_image_counter = 0
 
 
 def get_different_last_values(file_path):
@@ -91,6 +95,7 @@ def run_kriging_with_status():
     global kriging_status
     global DATA_FILE_NAME
     global robots
+    global shared_score_image_counter
     logger.debug("in run_kriging_with_status")
     save_grid()
     if len(get_different_last_values(DATA_FILE_NAME)) >= 3:
@@ -149,6 +154,8 @@ def run_kriging_with_status():
 
             # --- Step 9: Update robots with past goals ---
             robots = list(latest_robot_data.values())
+            voro = voronoi_masks(robots, grid_X, grid_Y)
+            
             for robot in robots:
                 if robot.id in goal_dict:
                     robot.goal_idx = goal_dict[robot.id]
@@ -163,14 +170,26 @@ def run_kriging_with_status():
                 robot.grid_idx = (row, col)  # this sets the start point for A*
             # --- Step 11: Compute holistic map and assign goals ---
             for robot in robots:
-                holistic_map = robot.compute_holistic_score_map(
-                    shared_score, grid_X, grid_Y
-                )
+                holistic_map = robot.compute_holistic_score_map(shared_score, grid_X, grid_Y,
+                                                            w_current_pos=0.10, w_goal=1.0, visualize=True)
                 goal, path, next_move = assign_goal_and_path_for_robot(
-                    robot, holistic_map, grid_X, grid_Y, visited_mask
-                )
+                robot, holistic_map, grid_X, grid_Y, visited_mask,
+                visualize=True,
+                voronoi_block=voro[robot.id]  # <= inject Voronoi mask here
+            )
                 goal_dict[robot.id] = robot.goal_idx
-
+            ownership_map = compute_ownership_map(robots, grid_X, grid_Y)
+            logger.critical("RUN VISUALIZATION SHARED SCORE")
+            visualize_shared_score(
+            shared_score, grid_X, grid_Y,
+            robots=robots,
+            visited_mask=visited_mask,          # mask array or set of (r,c)
+            ownership_map=ownership_map,        # draws Voronoi boundaries
+            title="Shared Score with Voronoi Boundaries",
+            show=False,
+            save_path=f'static/figures/Shared Score/{shared_score_image_counter}.png'
+        )
+            shared_score_image_counter = shared_score_image_counter+1
             # --- Step 12: Save goals and visited cells ---
             save_state(goals_file, goal_dict)
 
@@ -197,7 +216,8 @@ def save_grid():
             initial_pos = (lon, lat)
 
         # --- Step 2: Create grid around initial position ---
-        grid_X1, grid_Y1 = create_grid(initial_pos, grid_size=7, cell_size_lat=0.0001)
+        #Cell size (meters)cell_size_lat (degrees)5 m0.000044910 m0.000089820 m0.0001796
+        grid_X1, grid_Y1 = create_grid(initial_pos, grid_size=7, cell_size_lat=.00019236)
 
         # --- Step 3: Save to disk ---
         np.save(grid_x_file, grid_X1)
@@ -492,7 +512,7 @@ def run_ngrok():
 
 
 def run_server():
-    app.run(port=8080)
+    app.run(host="0.0.0.0", port=8080)
 
 
 if __name__ == "__main__":

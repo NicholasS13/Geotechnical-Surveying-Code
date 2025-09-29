@@ -6,7 +6,7 @@ let devicesWithReadings = new Set();
 let lastSensorTime = 0;
 let holisticPlotURL = ""
 const SENSOR_UPDATE_INTERVAL_MS = 2000;
-const goalReachThreshold = 5;
+const goalReachThreshold = 2;
 
 const measurementStatusEl = document.getElementById("measurementStatus");
 const readingStatusBox = document.getElementById("readingStatusBox");
@@ -29,7 +29,11 @@ document.getElementById('connect').addEventListener('click', async () => {
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ services: [SERVICE_UUID] }]
     });
-
+    
+    device.addEventListener('gattserverdisconnected', () => {
+      console.warn('Device disconnected');
+      document.getElementById('connect').style.display = 'block';
+    });
     const server = await device.gatt.connect();
     const service = await server.getPrimaryService(SERVICE_UUID);
 
